@@ -1096,7 +1096,7 @@ function update() {
 
         // Camera shake on death
         if (cameraShake > 0) {
-            camera.position.x = (Math.random() - 0.5) * cameraShake;
+            camera.position.x = playerGroup.position.x + (Math.random() - 0.5) * cameraShake;
             camera.position.y = 3 + (Math.random() - 0.5) * cameraShake;
             cameraShake *= 0.92;
             if (cameraShake < 0.01) cameraShake = 0;
@@ -1144,13 +1144,15 @@ function update() {
 
     playerGroup.position.y = playerY;
 
-    // Rotation while jumping
+    // Rotation - cube "rolls" proportionally to speed
+    // One full 90° turn per cube-width of distance traveled
+    const rotSpeed = speed / PLAYER_SIZE * (Math.PI / 2);
     if (!isGrounded) {
-        rotation -= speed * 4;
+        rotation -= rotSpeed;
     } else {
-        // Snap rotation to nearest 90 degrees
+        // Snap rotation to nearest 90 degrees when grounded
         const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
-        rotation += (target - rotation) * 0.2;
+        rotation += (target - rotation) * 0.3;
     }
     player.rotation.z = rotation;
 
@@ -1214,8 +1216,8 @@ function update() {
         }
     }
 
-    // Camera follow with slight bob
-    camera.position.x += (playerGroup.position.x - 2) * 0.01;
+    // Camera stays fixed on player (no drift)
+    camera.position.x = playerGroup.position.x;
     camera.position.y = 3 + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
 
     // Camera shake
