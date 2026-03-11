@@ -241,8 +241,8 @@ let distance = 0;
 let totalLevelLength = 600;
 let jumpVelocity = 0;
 let isGrounded = true;
-let gravity = -0.012;
-let jumpForce = 0.22;
+let gravity = -0.010;
+let jumpForce = 0.26;
 let playerY = 0.6;
 let rotation = 0;
 let groundY = 0;
@@ -387,7 +387,7 @@ function createGround() {
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = 0;
-    ground.position.z = -190;
+    ground.position.z = 190;
     ground.receiveShadow = true;
     scene.add(ground);
 
@@ -401,7 +401,7 @@ function createGround() {
         });
         const line = new THREE.Mesh(lineGeo, lineMat);
         line.rotation.x = -Math.PI / 2;
-        line.position.set(-i, 0.01, 0);
+        line.position.set(i, 0.01, 0);
         scene.add(line);
         groundTiles.push(line);
     }
@@ -416,7 +416,7 @@ function createGround() {
         });
         const strip = new THREE.Mesh(stripGeo, stripMat);
         strip.rotation.x = -Math.PI / 2;
-        strip.position.set(-190, 0.02, side);
+        strip.position.set(190, 0.02, side);
         scene.add(strip);
     }
 }
@@ -468,30 +468,30 @@ function generateLevel() {
         if (r < 0.3) {
             // Single spike
             levelData.push({ type: 'spike', x: pos, y: 0 });
-            pos += 4 - difficulty * 1.5;
+            pos += 5.5 - difficulty * 1.5;
         } else if (r < 0.5) {
             // Block obstacle
-            levelData.push({ type: 'block', x: pos, y: 0, height: 1 + Math.random() * 1.5 });
-            pos += 4 - difficulty;
+            levelData.push({ type: 'block', x: pos, y: 0, height: 0.8 + Math.random() * 1.0 });
+            pos += 5.5 - difficulty;
         } else if (r < 0.65) {
             // Double spike
             levelData.push({ type: 'spike', x: pos, y: 0 });
-            levelData.push({ type: 'spike', x: pos + 1.2, y: 0 });
-            pos += 5 - difficulty;
+            levelData.push({ type: 'spike', x: pos + 1.4, y: 0 });
+            pos += 7 - difficulty;
         } else if (r < 0.78) {
             // Tall pillar
-            levelData.push({ type: 'pillar', x: pos, y: 0, height: 2 + Math.random() * 2 });
-            pos += 5 - difficulty;
+            levelData.push({ type: 'pillar', x: pos, y: 0, height: 1.5 + Math.random() * 1.5 });
+            pos += 6 - difficulty;
         } else if (r < 0.88) {
             // Saw blade (spinning)
-            levelData.push({ type: 'saw', x: pos, y: 1.5 + Math.random() * 1.5 });
-            pos += 4.5 - difficulty;
+            levelData.push({ type: 'saw', x: pos, y: 1.8 + Math.random() * 1.2 });
+            pos += 5.5 - difficulty;
         } else {
             // Gap section with spikes
             levelData.push({ type: 'spike', x: pos, y: 0 });
-            levelData.push({ type: 'block', x: pos + 2, y: 0, height: 1.2 });
-            levelData.push({ type: 'spike', x: pos + 4, y: 0 });
-            pos += 7 - difficulty;
+            levelData.push({ type: 'block', x: pos + 2.5, y: 0, height: 1.0 });
+            levelData.push({ type: 'spike', x: pos + 5, y: 0 });
+            pos += 8.5 - difficulty;
         }
 
         // Decoration columns
@@ -516,7 +516,7 @@ function createObstacle(data) {
     const color = neonColors[Math.floor(Math.random() * neonColors.length)];
 
     if (data.type === 'spike') {
-        const geo = new THREE.ConeGeometry(0.5, 1.2, 4);
+        const geo = new THREE.ConeGeometry(0.4, 1.0, 4);
         const mat = new THREE.MeshStandardMaterial({
             color: color,
             emissive: color,
@@ -525,7 +525,7 @@ function createObstacle(data) {
             roughness: 0.3,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(-data.x, 0.6, 0);
+        mesh.position.set(data.x, 0.5, 0);
         mesh.castShadow = true;
 
         // Glow ring at base
@@ -538,11 +538,11 @@ function createObstacle(data) {
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(-data.x, 0.05, 0);
+        ring.position.set(data.x, 0.05, 0);
         scene.add(ring);
         decorations.push(ring);
 
-        mesh.userData = { type: 'spike', radius: 0.45, height: 1.2 };
+        mesh.userData = { type: 'spike', radius: 0.35, height: 1.0 };
 
     } else if (data.type === 'block') {
         const h = data.height || 1;
@@ -555,7 +555,7 @@ function createObstacle(data) {
             roughness: 0.2,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(-data.x, h / 2, 0);
+        mesh.position.set(data.x, h / 2, 0);
         mesh.castShadow = true;
 
         // Wireframe
@@ -579,12 +579,12 @@ function createObstacle(data) {
             roughness: 0.2,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(-data.x, h / 2, 0);
+        mesh.position.set(data.x, h / 2, 0);
         mesh.castShadow = true;
 
         // Top glow
         const topLight = new THREE.PointLight(0x8800ff, 1, 5);
-        topLight.position.set(-data.x, h + 0.5, 0);
+        topLight.position.set(data.x, h + 0.5, 0);
         scene.add(topLight);
         decorations.push(topLight);
 
@@ -600,7 +600,7 @@ function createObstacle(data) {
             roughness: 0.1,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(-data.x, data.y, 0);
+        mesh.position.set(data.x, data.y, 0);
 
         // Inner spokes
         for (let i = 0; i < 4; i++) {
@@ -636,7 +636,7 @@ function createDecoration(x, type) {
             opacity: 0.6,
         });
         const col = new THREE.Mesh(geo, mat);
-        col.position.set(-x, h / 2, side);
+        col.position.set(x, h / 2, side);
         scene.add(col);
         decorations.push(col);
     } else if (type === 'ring') {
@@ -647,7 +647,7 @@ function createDecoration(x, type) {
             opacity: 0.3,
         });
         const ring = new THREE.Mesh(geo, mat);
-        ring.position.set(-x, 2.5, 0);
+        ring.position.set(x, 2.5, 0);
         ring.rotation.y = Math.PI / 2;
         scene.add(ring);
         decorations.push(ring);
@@ -672,7 +672,7 @@ function spawnTrailParticle() {
         playerGroup.position.z + (Math.random() - 0.5) * 0.3
     );
     p.userData = {
-        vx: (Math.random() - 0.5) * 0.02 + 0.05,
+        vx: (Math.random() - 0.5) * 0.02 - 0.05,
         vy: (Math.random() - 0.5) * 0.03,
         vz: (Math.random() - 0.5) * 0.04,
         life: 1.0,
@@ -783,7 +783,7 @@ function spawnJumpBurst() {
 function checkCollision() {
     const px = playerGroup.position.x;
     const py = playerGroup.position.y;
-    const halfSize = PLAYER_SIZE * 0.4;
+    const halfSize = PLAYER_SIZE * 0.32; // Slightly forgiving hitbox
 
     for (const obs of obstacles) {
         const ox = obs.position.x;
@@ -795,21 +795,21 @@ function checkCollision() {
         if (ud.type === 'spike') {
             const dx = px - ox;
             const dy = py - oy;
-            if (Math.abs(dx) < halfSize + 0.25 && dy < 0.5 && dy > -0.6) {
+            if (Math.abs(dx) < halfSize + 0.18 && dy < 0.35 && dy > -0.5) {
                 return true;
             }
         } else if (ud.type === 'block' || ud.type === 'pillar') {
             const w = (ud.width || 0.8) / 2;
             const h = ud.height || 1;
-            if (px + halfSize > ox - w && px - halfSize < ox + w &&
-                py - halfSize < h && py + halfSize > 0.05) {
+            if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05 &&
+                py - halfSize < h - 0.05 && py + halfSize > 0.1) {
                 return true;
             }
         } else if (ud.type === 'saw') {
             const dx = px - ox;
             const dy = py - oy;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < (ud.radius || 0.85) + halfSize) {
+            if (dist < (ud.radius || 0.85) + halfSize - 0.1) {
                 return true;
             }
         }
@@ -965,7 +965,7 @@ function update() {
     document.getElementById('progress-bar').style.width = `${percent}%`;
 
     // Speed ramp
-    speed = baseSpeed + (distance / totalLevelLength) * 0.06;
+    speed = baseSpeed + (distance / totalLevelLength) * 0.04;
 
     // Color cycling
     colorPhase += 0.002;
@@ -1008,15 +1008,15 @@ function update() {
     }
     player.rotation.z = rotation;
 
-    // Move world
+    // Move world (obstacles come from right to left)
     for (const obs of obstacles) {
-        obs.position.x += speed;
+        obs.position.x -= speed;
     }
     for (const dec of decorations) {
-        if (dec.position) dec.position.x += speed;
+        if (dec.position) dec.position.x -= speed;
     }
     for (const g of groundTiles) {
-        g.position.x += speed;
+        g.position.x -= speed;
     }
 
     // Beat pulse effect
@@ -1069,7 +1069,7 @@ function update() {
     }
 
     // Camera follow with slight bob
-    camera.position.x += (playerGroup.position.x + 2) * 0.01;
+    camera.position.x += (playerGroup.position.x - 2) * 0.01;
     camera.position.y = 3 + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
 
     // Camera shake
