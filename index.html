@@ -456,50 +456,181 @@ function createStars() {
     bgStars.push(starField);
 }
 
+// --- JUMP PHYSICS CALCULATOR ---
+// Simulate the jump arc to know exactly how high/far the player can go
+function calcJumpArc(spd) {
+    // Returns { maxHeight, totalFrames, jumpDistance, heightAtDist(d) }
+    const frames = [];
+    let vy = jumpForce;
+    let y = 0; // relative to ground
+    let x = 0;
+    let frame = 0;
+    while (y >= 0 || frame === 0) {
+        frames.push({ x, y });
+        vy += gravity;
+        y += vy;
+        x += spd;
+        frame++;
+        if (frame > 200) break; // safety
+    }
+    const maxHeight = Math.max(...frames.map(f => f.y));
+    const jumpDistance = x;
+    // Get height at a given horizontal distance from jump start
+    function heightAtDist(d) {
+        for (let i = 0; i < frames.length - 1; i++) {
+            if (frames[i].x <= d && frames[i + 1].x > d) {
+                const t = (d - frames[i].x) / (frames[i + 1].x - frames[i].x);
+                return frames[i].y + t * (frames[i + 1].y - frames[i].y);
+            }
+        }
+        return 0;
+    }
+    return { maxHeight, totalFrames: frame, jumpDistance, heightAtDist, frames };
+}
+
+// Check if an obstacle group is clearable with a single jump
+function canClearGroup(groupObstacles, spd) {
+    const arc = calcJumpArc(spd);
+    // Find the total horizontal span the player must clear
+    let minX = Infinity, maxX = -Infinity;
+    for (const obs of groupObstacles) {
+        const halfW = obs.type === 'spike' ? 0.4 : (obs.type === 'saw' ? 0.85 : 0.4);
+        minX = Math.min(minX, obs.x - halfW);
+        maxX = Math.max(maxX, obs.x + halfW);
+    }
+    const clearWidth = maxX - minX;
+
+    // Player can jump early - find best jump point
+    // Try jumping 0.5-2.0 units before the first obstacle
+    for (let jumpOffset = 0.3; jumpOffset < 2.5; jumpOffset += 0.2) {
+        const jumpX = minX - jumpOffset;
+        let clears = true;
+        for (const obs of groupObstacles) {
+            const dist = obs.x - jumpX;
+            const playerH = arc.heightAtDist(dist);
+            let requiredH;
+            if (obs.type === 'spike') {
+                requiredH = 0.6; // spike effective height from ground
+            } else if (obs.type === 'saw') {
+                requiredH = (obs.y || 2) - GROUND_LEVEL + 0.85;
+            } else {
+                requiredH = (obs.height || 1) - GROUND_LEVEL + 0.2;
+            }
+            if (playerH < requiredH) {
+                clears = false;
+                break;
+            }
+        }
+        // Also check that player lands after the last obstacle
+        const landDist = maxX + 0.3 - jumpX;
+        if (clears && landDist < arc.jumpDistance) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // --- LEVEL GENERATION ---
 function generateLevel() {
     levelData = [];
     let pos = 15;
 
+    // Calculate jump capabilities at different speeds
+    const arcSlow = calcJumpArc(baseSpeed);
+    const arcFast = calcJumpArc(baseSpeed + 0.04);
+    // Max jumpable obstacle height (with margin)
+    const maxJumpableHeight = arcSlow.maxHeight + GROUND_LEVEL - 0.3;
+    // Max clearable horizontal span
+    const maxClearSpan = arcSlow.jumpDistance * 0.7; // 70% of max for safety
+
     while (pos < totalLevelLength) {
         const difficulty = Math.min(pos / totalLevelLength, 1);
+        const currentSpeed = baseSpeed + difficulty * 0.04;
         const r = Math.random();
+
+        // Minimum gap = enough time to land and react before next jump
+        // At least 2.5 units at start, shrinking to 1.8 at max difficulty
+        const minReactGap = 2.5 - difficulty * 0.7;
+
+        let groupObstacles = [];
 
         if (r < 0.3) {
             // Single spike
-            levelData.push({ type: 'spike', x: pos, y: 0 });
-            pos += 5.5 - difficulty * 1.5;
+            groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
         } else if (r < 0.5) {
-            // Block obstacle
-            levelData.push({ type: 'block', x: pos, y: 0, height: 0.8 + Math.random() * 1.0 });
-            pos += 5.5 - difficulty;
+            // Block obstacle - cap height to be jumpable
+            const maxH = Math.min(0.8 + Math.random() * 1.0, maxJumpableHeight);
+            groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
         } else if (r < 0.65) {
-            // Double spike
-            levelData.push({ type: 'spike', x: pos, y: 0 });
-            levelData.push({ type: 'spike', x: pos + 1.4, y: 0 });
-            pos += 7 - difficulty;
+            // Double spike - must fit within single jump arc
+            const spacing = 1.0 + Math.random() * 0.5;
+            groupObstacles = [
+                { type: 'spike', x: pos, y: 0 },
+                { type: 'spike', x: pos + spacing, y: 0 },
+            ];
         } else if (r < 0.78) {
-            // Tall pillar
-            levelData.push({ type: 'pillar', x: pos, y: 0, height: 1.5 + Math.random() * 1.5 });
-            pos += 6 - difficulty;
+            // Pillar - cap height to be jumpable
+            const maxH = Math.min(1.5 + Math.random() * 1.0, maxJumpableHeight);
+            groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
         } else if (r < 0.88) {
-            // Saw blade (spinning)
-            levelData.push({ type: 'saw', x: pos, y: 1.8 + Math.random() * 1.2 });
-            pos += 5.5 - difficulty;
+            // Saw blade - ensure it's low enough to jump over OR high enough to run under
+            const sawY = 1.2 + Math.random() * 0.6;
+            // Verify player can jump over it
+            if (sawY - 0.85 < maxJumpableHeight) {
+                groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
+            } else {
+                // Fallback to a spike
+                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            }
         } else {
-            // Gap section with spikes
-            levelData.push({ type: 'spike', x: pos, y: 0 });
-            levelData.push({ type: 'block', x: pos + 2.5, y: 0, height: 1.0 });
-            levelData.push({ type: 'spike', x: pos + 5, y: 0 });
-            pos += 8.5 - difficulty;
+            // Combo section - spike + block + spike, all within one jump
+            const blockH = Math.min(0.8 + Math.random() * 0.4, maxJumpableHeight);
+            const span1 = 1.5 + Math.random() * 0.5;
+            const span2 = span1 + 1.5 + Math.random() * 0.5;
+            // Ensure total span fits within a single jump
+            if (span2 + 0.5 < maxClearSpan) {
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'block', x: pos + span1, y: 0, height: blockH },
+                    { type: 'spike', x: pos + span2, y: 0 },
+                ];
+            } else {
+                // Too wide for one jump - just do a single spike
+                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            }
         }
+
+        // Verify the group is clearable
+        if (!canClearGroup(groupObstacles, currentSpeed)) {
+            // Reduce heights until clearable
+            for (const obs of groupObstacles) {
+                if (obs.height) obs.height = Math.min(obs.height, maxJumpableHeight * 0.8);
+                if (obs.y && obs.type === 'saw') obs.y = Math.min(obs.y, 1.2);
+            }
+            // If still not clearable with reduced group, just use single spike
+            if (!canClearGroup(groupObstacles, currentSpeed)) {
+                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            }
+        }
+
+        // Add obstacles to level
+        for (const obs of groupObstacles) {
+            levelData.push(obs);
+        }
+
+        // Calculate gap after this group
+        const lastObs = groupObstacles[groupObstacles.length - 1];
+        const groupEnd = lastObs.x + (lastObs.type === 'spike' ? 0.4 : 0.5);
+        // Gap = landing distance + reaction time
+        const gap = minReactGap + Math.random() * (2.0 - difficulty * 1.0);
+        pos = groupEnd + gap;
 
         // Decoration columns
         if (Math.random() < 0.3) {
-            createDecoration(pos - 2, 'column');
+            createDecoration(pos - 1.5, 'column');
         }
         if (Math.random() < 0.2) {
-            createDecoration(pos - 1, 'ring');
+            createDecoration(pos - 0.8, 'ring');
         }
     }
 
