@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometry Dash - Na Steroidech!</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            cursor: default;
+        }
+        canvas { display: block; }
+
+        #ui-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #score-display {
+            position: fixed;
+            top: 20px; right: 30px;
+            color: #fff;
+            font-size: 28px;
+            font-weight: 900;
+            text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #08f;
+            z-index: 20;
+            letter-spacing: 2px;
+        }
+
+        #attempt-display {
+            position: fixed;
+            top: 20px; left: 30px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 700;
+            text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
+            z-index: 20;
+        }
+
+        #progress-bar-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 4px;
+            background: rgba(255,255,255,0.1);
+            z-index: 20;
+        }
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0ff, #f0f, #ff0);
+            box-shadow: 0 0 10px #0ff, 0 0 20px #f0f;
+            transition: width 0.1s linear;
+        }
+
+        #start-screen, #death-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: all;
+        }
+
+        #start-screen {
+            background: radial-gradient(ellipse at center, rgba(0,20,40,0.95) 0%, rgba(0,0,0,0.98) 100%);
+        }
+
+        #start-screen h1 {
+            font-size: 72px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #0ff, #f0f, #ff0, #0f0);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 3s ease infinite;
+            text-shadow: none;
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+
+        #start-screen .subtitle {
+            font-size: 22px;
+            color: #888;
+            margin-bottom: 50px;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+        }
+
+        #start-screen .controls-info {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .start-btn {
+            padding: 18px 60px;
+            font-size: 24px;
+            font-weight: 800;
+            border: 2px solid #0ff;
+            background: transparent;
+            color: #0ff;
+            cursor: pointer;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .start-btn:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 30px #0ff, 0 0 60px #0ff;
+            transform: scale(1.05);
+        }
+
+        .start-btn::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            background: linear-gradient(45deg, #0ff, #f0f, #ff0, #0ff);
+            background-size: 400% 400%;
+            z-index: -1;
+            animation: gradientShift 3s ease infinite;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .start-btn:hover::before { opacity: 1; }
+
+        #death-screen {
+            background: radial-gradient(ellipse at center, rgba(40,0,0,0.95) 0%, rgba(0,0,0,0.98) 100%);
+            display: none;
+        }
+
+        #death-screen h2 {
+            font-size: 56px;
+            color: #f33;
+            font-weight: 900;
+            text-shadow: 0 0 20px #f00, 0 0 40px #f00;
+            margin-bottom: 20px;
+            animation: shake 0.5s ease;
+        }
+
+        #death-screen .death-score {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        #death-screen .death-percent {
+            font-size: 20px;
+            color: #888;
+            margin-bottom: 40px;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .flash-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #fff;
+            z-index: 50;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.05s;
+        }
+
+        .flash-active {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+<div id="score-display">0%</div>
+<div id="attempt-display">Pokus #1</div>
+<div id="progress-bar-container"><div id="progress-bar"></div></div>
+
+<div id="start-screen">
+    <h1>GEOMETRY DASH</h1>
+    <div class="subtitle">Na Steroidech</div>
+    <div class="controls-info">MEZERNÍK / KLIK = Skok &nbsp;|&nbsp; NAHORU = Skok &nbsp;|&nbsp; Drž pro multi-skok</div>
+    <button class="start-btn" id="start-btn">START</button>
+</div>
+
+<div id="death-screen">
+    <h2>CRASH!</h2>
+    <div class="death-score" id="death-score">Skóre: 0%</div>
+    <div class="death-percent" id="death-best">Nejlepší: 0%</div>
+    <button class="start-btn" id="retry-btn">ZNOVU</button>
+</div>
+
+<div class="flash-overlay" id="flash-overlay"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+//  GEOMETRY DASH NA STEROIDECH - Three.js
+// ============================================================
+
+// --- GLOBALS ---
+let scene, camera, renderer, composer;
+let player, playerGroup;
+let obstacles = [];
+let decorations = [];
+let particles = [];
+let trailParticles = [];
+let groundTiles = [];
+let bgStars = [];
+let shockwaves = [];
+
+let gameRunning = false;
+let gameStarted = false;
+let isDead = false;
+let speed = 0.18;
+let baseSpeed = 0.18;
+let score = 0;
+let bestScore = 0;
+let attempts = 1;
+let distance = 0;
+let totalLevelLength = 600;
+let jumpVelocity = 0;
+let isGrounded = true;
+let gravity = -0.012;
+let jumpForce = 0.22;
+let playerY = 0.6;
+let rotation = 0;
+let groundY = 0;
+let jumpPressed = false;
+let cameraShake = 0;
+let beatPulse = 0;
+let colorPhase = 0;
+let obstacleTimer = 0;
+let difficultyRamp = 0;
+let comboCount = 0;
+let lastObstaclePassed = -999;
+
+// Level data
+let levelData = [];
+let levelIndex = 0;
+
+const PLAYER_SIZE = 0.55;
+const GROUND_LEVEL = 0.6;
+
+// --- INIT ---
+function init() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000011, 0.012);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 3, 8);
+    camera.lookAt(0, 1, 0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    document.body.appendChild(renderer.domElement);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 10, 5);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    const pointLight1 = new THREE.PointLight(0x00ffff, 2, 30);
+    pointLight1.position.set(0, 5, 0);
+    scene.add(pointLight1);
+
+    const pointLight2 = new THREE.PointLight(0xff00ff, 1.5, 30);
+    pointLight2.position.set(5, 3, -5);
+    scene.add(pointLight2);
+
+    // Player
+    createPlayer();
+
+    // Ground
+    createGround();
+
+    // Background stars
+    createStars();
+
+    // Generate level
+    generateLevel();
+
+    // Events
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('mousedown', () => { jumpPressed = true; });
+    window.addEventListener('mouseup', () => { jumpPressed = false; });
+    window.addEventListener('touchstart', (e) => { e.preventDefault(); jumpPressed = true; }, { passive: false });
+    window.addEventListener('touchend', () => { jumpPressed = false; });
+
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('retry-btn').addEventListener('click', restartGame);
+
+    animate();
+}
+
+// --- PLAYER ---
+function createPlayer() {
+    playerGroup = new THREE.Group();
+
+    // Main cube with emissive neon material
+    const geo = new THREE.BoxGeometry(PLAYER_SIZE, PLAYER_SIZE, PLAYER_SIZE);
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0x00ffff,
+        emissive: 0x00aaff,
+        emissiveIntensity: 0.6,
+        metalness: 0.8,
+        roughness: 0.2,
+    });
+    player = new THREE.Mesh(geo, mat);
+    player.castShadow = true;
+    playerGroup.add(player);
+
+    // Inner glow cube
+    const innerGeo = new THREE.BoxGeometry(PLAYER_SIZE * 0.7, PLAYER_SIZE * 0.7, PLAYER_SIZE * 0.7);
+    const innerMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.3,
+    });
+    const innerCube = new THREE.Mesh(innerGeo, innerMat);
+    playerGroup.add(innerCube);
+
+    // Wireframe outline
+    const wireGeo = new THREE.BoxGeometry(PLAYER_SIZE * 1.05, PLAYER_SIZE * 1.05, PLAYER_SIZE * 1.05);
+    const wireMat = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.5,
+    });
+    const wireCube = new THREE.Mesh(wireGeo, wireMat);
+    playerGroup.add(wireCube);
+
+    // Point light on player
+    const playerLight = new THREE.PointLight(0x00ffff, 2, 8);
+    playerLight.position.set(0, 0, 0);
+    playerGroup.add(playerLight);
+
+    playerGroup.position.set(0, GROUND_LEVEL, 0);
+    scene.add(playerGroup);
+}
+
+// --- GROUND ---
+function createGround() {
+    // Main ground plane
+    const groundGeo = new THREE.PlaneGeometry(400, 8);
+    const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x111122,
+        metalness: 0.9,
+        roughness: 0.3,
+        emissive: 0x050510,
+        emissiveIntensity: 0.3,
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    ground.position.z = -190;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Grid lines on ground
+    for (let i = -20; i < 400; i += 2) {
+        const lineGeo = new THREE.PlaneGeometry(0.02, 8);
+        const lineMat = new THREE.MeshBasicMaterial({
+            color: 0x0044ff,
+            transparent: true,
+            opacity: 0.2,
+        });
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        line.rotation.x = -Math.PI / 2;
+        line.position.set(-i, 0.01, 0);
+        scene.add(line);
+        groundTiles.push(line);
+    }
+
+    // Side glow strips
+    for (let side of [-3.5, 3.5]) {
+        const stripGeo = new THREE.PlaneGeometry(400, 0.1);
+        const stripMat = new THREE.MeshBasicMaterial({
+            color: 0xff00ff,
+            transparent: true,
+            opacity: 0.6,
+        });
+        const strip = new THREE.Mesh(stripGeo, stripMat);
+        strip.rotation.x = -Math.PI / 2;
+        strip.position.set(-190, 0.02, side);
+        scene.add(strip);
+    }
+}
+
+// --- STARS ---
+function createStars() {
+    const starsGeo = new THREE.BufferGeometry();
+    const positions = [];
+    const colors = [];
+    const sizes = [];
+
+    for (let i = 0; i < 2000; i++) {
+        positions.push(
+            (Math.random() - 0.5) * 200,
+            Math.random() * 60 + 5,
+            (Math.random() - 0.5) * 100 - 20
+        );
+
+        const c = new THREE.Color();
+        c.setHSL(Math.random(), 0.8, 0.7);
+        colors.push(c.r, c.g, c.b);
+        sizes.push(Math.random() * 2 + 0.5);
+    }
+
+    starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    starsGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const starsMat = new THREE.PointsMaterial({
+        size: 0.15,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+    });
+    const starField = new THREE.Points(starsGeo, starsMat);
+    scene.add(starField);
+    bgStars.push(starField);
+}
+
+// --- LEVEL GENERATION ---
+function generateLevel() {
+    levelData = [];
+    let pos = 15;
+
+    while (pos < totalLevelLength) {
+        const difficulty = Math.min(pos / totalLevelLength, 1);
+        const r = Math.random();
+
+        if (r < 0.3) {
+            // Single spike
+            levelData.push({ type: 'spike', x: pos, y: 0 });
+            pos += 4 - difficulty * 1.5;
+        } else if (r < 0.5) {
+            // Block obstacle
+            levelData.push({ type: 'block', x: pos, y: 0, height: 1 + Math.random() * 1.5 });
+            pos += 4 - difficulty;
+        } else if (r < 0.65) {
+            // Double spike
+            levelData.push({ type: 'spike', x: pos, y: 0 });
+            levelData.push({ type: 'spike', x: pos + 1.2, y: 0 });
+            pos += 5 - difficulty;
+        } else if (r < 0.78) {
+            // Tall pillar
+            levelData.push({ type: 'pillar', x: pos, y: 0, height: 2 + Math.random() * 2 });
+            pos += 5 - difficulty;
+        } else if (r < 0.88) {
+            // Saw blade (spinning)
+            levelData.push({ type: 'saw', x: pos, y: 1.5 + Math.random() * 1.5 });
+            pos += 4.5 - difficulty;
+        } else {
+            // Gap section with spikes
+            levelData.push({ type: 'spike', x: pos, y: 0 });
+            levelData.push({ type: 'block', x: pos + 2, y: 0, height: 1.2 });
+            levelData.push({ type: 'spike', x: pos + 4, y: 0 });
+            pos += 7 - difficulty;
+        }
+
+        // Decoration columns
+        if (Math.random() < 0.3) {
+            createDecoration(pos - 2, 'column');
+        }
+        if (Math.random() < 0.2) {
+            createDecoration(pos - 1, 'ring');
+        }
+    }
+
+    // Create 3D obstacles from level data
+    for (const item of levelData) {
+        createObstacle(item);
+    }
+}
+
+// --- OBSTACLES ---
+function createObstacle(data) {
+    let mesh;
+    const neonColors = [0xff0044, 0xff4400, 0xff0088, 0xcc0000, 0xff2200];
+    const color = neonColors[Math.floor(Math.random() * neonColors.length)];
+
+    if (data.type === 'spike') {
+        const geo = new THREE.ConeGeometry(0.5, 1.2, 4);
+        const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.8,
+            metalness: 0.7,
+            roughness: 0.3,
+        });
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(-data.x, 0.6, 0);
+        mesh.castShadow = true;
+
+        // Glow ring at base
+        const ringGeo = new THREE.RingGeometry(0.3, 0.5, 16);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.DoubleSide,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(-data.x, 0.05, 0);
+        scene.add(ring);
+        decorations.push(ring);
+
+        mesh.userData = { type: 'spike', radius: 0.45, height: 1.2 };
+
+    } else if (data.type === 'block') {
+        const h = data.height || 1;
+        const geo = new THREE.BoxGeometry(0.8, h, 0.8);
+        const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.5,
+            metalness: 0.8,
+            roughness: 0.2,
+        });
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(-data.x, h / 2, 0);
+        mesh.castShadow = true;
+
+        // Wireframe
+        const wireGeo = new THREE.BoxGeometry(0.85, h + 0.05, 0.85);
+        const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.15 });
+        const wire = new THREE.Mesh(wireGeo, wireMat);
+        wire.position.copy(mesh.position);
+        scene.add(wire);
+        decorations.push(wire);
+
+        mesh.userData = { type: 'block', width: 0.8, height: h };
+
+    } else if (data.type === 'pillar') {
+        const h = data.height || 3;
+        const geo = new THREE.BoxGeometry(0.6, h, 0.6);
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0x8800ff,
+            emissive: 0x6600cc,
+            emissiveIntensity: 0.7,
+            metalness: 0.8,
+            roughness: 0.2,
+        });
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(-data.x, h / 2, 0);
+        mesh.castShadow = true;
+
+        // Top glow
+        const topLight = new THREE.PointLight(0x8800ff, 1, 5);
+        topLight.position.set(-data.x, h + 0.5, 0);
+        scene.add(topLight);
+        decorations.push(topLight);
+
+        mesh.userData = { type: 'pillar', width: 0.6, height: h };
+
+    } else if (data.type === 'saw') {
+        const geo = new THREE.TorusGeometry(0.7, 0.15, 8, 16);
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xff8800,
+            emissive: 0xff4400,
+            emissiveIntensity: 1.0,
+            metalness: 0.9,
+            roughness: 0.1,
+        });
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(-data.x, data.y, 0);
+
+        // Inner spokes
+        for (let i = 0; i < 4; i++) {
+            const spokeGeo = new THREE.BoxGeometry(1.2, 0.08, 0.08);
+            const spokeMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
+            const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+            spoke.rotation.z = (Math.PI / 4) * i;
+            mesh.add(spoke);
+        }
+
+        mesh.userData = { type: 'saw', radius: 0.85, spinning: true };
+    }
+
+    if (mesh) {
+        scene.add(mesh);
+        obstacles.push(mesh);
+    }
+}
+
+// --- DECORATIONS ---
+function createDecoration(x, type) {
+    if (type === 'column') {
+        const h = 3 + Math.random() * 5;
+        const side = Math.random() > 0.5 ? 3 : -3;
+        const geo = new THREE.BoxGeometry(0.3, h, 0.3);
+        const hue = Math.random();
+        const color = new THREE.Color().setHSL(hue, 1, 0.5);
+        const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.4,
+            transparent: true,
+            opacity: 0.6,
+        });
+        const col = new THREE.Mesh(geo, mat);
+        col.position.set(-x, h / 2, side);
+        scene.add(col);
+        decorations.push(col);
+    } else if (type === 'ring') {
+        const geo = new THREE.TorusGeometry(1.5, 0.05, 8, 32);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x00ff88,
+            transparent: true,
+            opacity: 0.3,
+        });
+        const ring = new THREE.Mesh(geo, mat);
+        ring.position.set(-x, 2.5, 0);
+        ring.rotation.y = Math.PI / 2;
+        scene.add(ring);
+        decorations.push(ring);
+    }
+}
+
+// --- PARTICLES ---
+function spawnTrailParticle() {
+    const geo = new THREE.SphereGeometry(0.05 + Math.random() * 0.08, 4, 4);
+    const hue = (colorPhase + Math.random() * 0.1) % 1;
+    const color = new THREE.Color().setHSL(hue, 1, 0.6);
+    const mat = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+    });
+    const p = new THREE.Mesh(geo, mat);
+    p.position.set(
+        playerGroup.position.x + (Math.random() - 0.5) * 0.3,
+        playerGroup.position.y + (Math.random() - 0.5) * 0.3,
+        playerGroup.position.z + (Math.random() - 0.5) * 0.3
+    );
+    p.userData = {
+        vx: (Math.random() - 0.5) * 0.02 + 0.05,
+        vy: (Math.random() - 0.5) * 0.03,
+        vz: (Math.random() - 0.5) * 0.04,
+        life: 1.0,
+        decay: 0.015 + Math.random() * 0.015,
+    };
+    scene.add(p);
+    trailParticles.push(p);
+}
+
+function spawnExplosion(x, y, z, count, colorBase) {
+    for (let i = 0; i < count; i++) {
+        const size = 0.05 + Math.random() * 0.2;
+        let geo;
+        const r = Math.random();
+        if (r < 0.33) {
+            geo = new THREE.BoxGeometry(size, size, size);
+        } else if (r < 0.66) {
+            geo = new THREE.TetrahedronGeometry(size);
+        } else {
+            geo = new THREE.SphereGeometry(size, 4, 4);
+        }
+
+        const hue = (colorBase + Math.random() * 0.15) % 1;
+        const color = new THREE.Color().setHSL(hue, 1, 0.6);
+        const mat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 1,
+            blending: THREE.AdditiveBlending,
+        });
+        const p = new THREE.Mesh(geo, mat);
+        p.position.set(x, y, z);
+
+        const angle = Math.random() * Math.PI * 2;
+        const upAngle = Math.random() * Math.PI - Math.PI * 0.3;
+        const force = 0.05 + Math.random() * 0.2;
+
+        p.userData = {
+            vx: Math.cos(angle) * Math.cos(upAngle) * force,
+            vy: Math.sin(upAngle) * force + 0.08,
+            vz: Math.sin(angle) * Math.cos(upAngle) * force,
+            life: 1.0,
+            decay: 0.008 + Math.random() * 0.012,
+            rotSpeed: (Math.random() - 0.5) * 0.3,
+            gravity: -0.003,
+        };
+        scene.add(p);
+        particles.push(p);
+    }
+}
+
+function spawnShockwave(x, y, z) {
+    const geo = new THREE.RingGeometry(0.1, 0.3, 32);
+    const mat = new THREE.MeshBasicMaterial({
+        color: 0xff4400,
+        transparent: true,
+        opacity: 1,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+    });
+    const ring = new THREE.Mesh(geo, mat);
+    ring.position.set(x, y, z);
+    ring.rotation.x = -Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+    ring.userData = { life: 1.0, speed: 0.15 };
+    scene.add(ring);
+    shockwaves.push(ring);
+
+    // Second ring - vertical
+    const ring2 = ring.clone();
+    ring2.material = mat.clone();
+    ring2.rotation.x = (Math.random() - 0.5) * 0.5;
+    ring2.rotation.y = Math.random() * Math.PI;
+    ring2.userData = { life: 1.0, speed: 0.12 };
+    scene.add(ring2);
+    shockwaves.push(ring2);
+}
+
+function spawnJumpBurst() {
+    for (let i = 0; i < 8; i++) {
+        const geo = new THREE.SphereGeometry(0.04, 4, 4);
+        const color = new THREE.Color().setHSL(0.5 + Math.random() * 0.1, 1, 0.7);
+        const mat = new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 1,
+            blending: THREE.AdditiveBlending,
+        });
+        const p = new THREE.Mesh(geo, mat);
+        p.position.set(
+            playerGroup.position.x,
+            playerGroup.position.y - PLAYER_SIZE / 2,
+            playerGroup.position.z
+        );
+        const angle = Math.random() * Math.PI * 2;
+        p.userData = {
+            vx: Math.cos(angle) * 0.05,
+            vy: -0.02 - Math.random() * 0.03,
+            vz: Math.sin(angle) * 0.05,
+            life: 1.0,
+            decay: 0.03,
+        };
+        scene.add(p);
+        particles.push(p);
+    }
+}
+
+// --- COLLISION ---
+function checkCollision() {
+    const px = playerGroup.position.x;
+    const py = playerGroup.position.y;
+    const halfSize = PLAYER_SIZE * 0.4;
+
+    for (const obs of obstacles) {
+        const ox = obs.position.x;
+        const oy = obs.position.y;
+        const ud = obs.userData;
+
+        if (Math.abs(px - ox) > 3) continue;
+
+        if (ud.type === 'spike') {
+            const dx = px - ox;
+            const dy = py - oy;
+            if (Math.abs(dx) < halfSize + 0.25 && dy < 0.5 && dy > -0.6) {
+                return true;
+            }
+        } else if (ud.type === 'block' || ud.type === 'pillar') {
+            const w = (ud.width || 0.8) / 2;
+            const h = ud.height || 1;
+            if (px + halfSize > ox - w && px - halfSize < ox + w &&
+                py - halfSize < h && py + halfSize > 0.05) {
+                return true;
+            }
+        } else if (ud.type === 'saw') {
+            const dx = px - ox;
+            const dy = py - oy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < (ud.radius || 0.85) + halfSize) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// --- GAME LOGIC ---
+function startGame() {
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('death-screen').style.display = 'none';
+    gameRunning = true;
+    gameStarted = true;
+    isDead = false;
+    distance = 0;
+    score = 0;
+    playerY = GROUND_LEVEL;
+    jumpVelocity = 0;
+    isGrounded = true;
+    rotation = 0;
+    speed = baseSpeed;
+    comboCount = 0;
+    colorPhase = 0;
+
+    playerGroup.position.set(0, GROUND_LEVEL, 0);
+    player.rotation.set(0, 0, 0);
+
+    camera.position.set(0, 3, 8);
+}
+
+function restartGame() {
+    // Clean up old level
+    for (const obs of obstacles) {
+        scene.remove(obs);
+    }
+    for (const dec of decorations) {
+        scene.remove(dec);
+    }
+    for (const p of particles) {
+        scene.remove(p);
+    }
+    for (const p of trailParticles) {
+        scene.remove(p);
+    }
+    for (const s of shockwaves) {
+        scene.remove(s);
+    }
+    for (const g of groundTiles) {
+        scene.remove(g);
+    }
+
+    obstacles = [];
+    decorations = [];
+    particles = [];
+    trailParticles = [];
+    shockwaves = [];
+    groundTiles = [];
+
+    // Recreate
+    createGround();
+    generateLevel();
+
+    attempts++;
+    document.getElementById('attempt-display').textContent = `Pokus #${attempts}`;
+
+    playerGroup.visible = true;
+    startGame();
+}
+
+function die() {
+    if (isDead) return;
+    isDead = true;
+    gameRunning = false;
+
+    const px = playerGroup.position.x;
+    const py = playerGroup.position.y;
+    const pz = playerGroup.position.z;
+
+    // Massive explosion
+    spawnExplosion(px, py, pz, 80, 0.0);
+    spawnExplosion(px, py, pz, 40, 0.55);
+    spawnExplosion(px, py, pz, 30, 0.15);
+    spawnShockwave(px, py, pz);
+    spawnShockwave(px, py, pz);
+    spawnShockwave(px, py + 0.5, pz);
+
+    // Screen flash
+    const flash = document.getElementById('flash-overlay');
+    flash.classList.add('flash-active');
+    setTimeout(() => flash.classList.remove('flash-active'), 100);
+
+    cameraShake = 2.0;
+
+    playerGroup.visible = false;
+
+    // Calculate score
+    const percent = Math.floor((distance / totalLevelLength) * 100);
+    if (percent > bestScore) bestScore = percent;
+
+    setTimeout(() => {
+        document.getElementById('death-screen').style.display = 'flex';
+        document.getElementById('death-score').textContent = `Skóre: ${percent}%`;
+        document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
+    }, 800);
+}
+
+// --- INPUT ---
+function onKeyDown(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        e.preventDefault();
+        jumpPressed = true;
+    }
+}
+
+function onKeyUp(e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        jumpPressed = false;
+    }
+}
+
+// --- UPDATE ---
+function update() {
+    if (!gameStarted) {
+        // Idle animation
+        colorPhase += 0.003;
+        const idleColor = new THREE.Color().setHSL(colorPhase % 1, 1, 0.5);
+        player.material.color.copy(idleColor);
+        player.material.emissive.copy(idleColor);
+        playerGroup.rotation.y += 0.02;
+        playerGroup.position.y = GROUND_LEVEL + Math.sin(Date.now() * 0.002) * 0.3;
+        return;
+    }
+
+    if (!gameRunning) {
+        // Update particles even when dead
+        updateParticles();
+        updateShockwaves();
+
+        // Camera shake on death
+        if (cameraShake > 0) {
+            camera.position.x = (Math.random() - 0.5) * cameraShake;
+            camera.position.y = 3 + (Math.random() - 0.5) * cameraShake;
+            cameraShake *= 0.92;
+            if (cameraShake < 0.01) cameraShake = 0;
+        }
+        return;
+    }
+
+    // --- MOVEMENT ---
+    distance += speed;
+    const percent = Math.min(Math.floor((distance / totalLevelLength) * 100), 100);
+    document.getElementById('score-display').textContent = `${percent}%`;
+    document.getElementById('progress-bar').style.width = `${percent}%`;
+
+    // Speed ramp
+    speed = baseSpeed + (distance / totalLevelLength) * 0.06;
+
+    // Color cycling
+    colorPhase += 0.002;
+    const playerColor = new THREE.Color().setHSL((colorPhase * 2) % 1, 1, 0.5);
+    player.material.color.copy(playerColor);
+    player.material.emissive.copy(playerColor);
+    playerGroup.children[3].color.copy(playerColor); // point light
+
+    // Jump
+    if (jumpPressed && isGrounded) {
+        jumpVelocity = jumpForce;
+        isGrounded = false;
+        spawnJumpBurst();
+    }
+
+    // Gravity
+    if (!isGrounded) {
+        jumpVelocity += gravity;
+        playerY += jumpVelocity;
+
+        if (playerY <= GROUND_LEVEL) {
+            playerY = GROUND_LEVEL;
+            jumpVelocity = 0;
+            isGrounded = true;
+
+            // Land effect
+            spawnJumpBurst();
+        }
+    }
+
+    playerGroup.position.y = playerY;
+
+    // Rotation while jumping
+    if (!isGrounded) {
+        rotation -= speed * 4;
+    } else {
+        // Snap rotation to nearest 90 degrees
+        const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
+        rotation += (target - rotation) * 0.2;
+    }
+    player.rotation.z = rotation;
+
+    // Move world
+    for (const obs of obstacles) {
+        obs.position.x += speed;
+    }
+    for (const dec of decorations) {
+        if (dec.position) dec.position.x += speed;
+    }
+    for (const g of groundTiles) {
+        g.position.x += speed;
+    }
+
+    // Beat pulse effect
+    beatPulse *= 0.95;
+    const scaleFactor = 1 + beatPulse * 0.1;
+    playerGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+    // Trail particles
+    if (Math.random() < 0.6) {
+        spawnTrailParticle();
+    }
+
+    // Collision check
+    if (checkCollision()) {
+        die();
+        return;
+    }
+
+    // Win condition
+    if (distance >= totalLevelLength) {
+        // Victory explosion!
+        for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+                spawnExplosion(
+                    playerGroup.position.x + (Math.random() - 0.5) * 3,
+                    playerGroup.position.y + Math.random() * 3,
+                    playerGroup.position.z + (Math.random() - 0.5) * 3,
+                    50, Math.random()
+                );
+            }, i * 200);
+        }
+        gameRunning = false;
+        const percent2 = 100;
+        if (percent2 > bestScore) bestScore = percent2;
+        setTimeout(() => {
+            document.getElementById('death-screen').style.display = 'flex';
+            document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
+            document.getElementById('death-screen').querySelector('h2').style.color = '#0f0';
+            document.getElementById('death-screen').querySelector('h2').style.textShadow = '0 0 20px #0f0, 0 0 40px #0f0';
+            document.getElementById('death-score').textContent = `Skóre: 100%`;
+            document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
+        }, 1200);
+    }
+
+    // Obstacles spinning
+    for (const obs of obstacles) {
+        if (obs.userData.spinning) {
+            obs.rotation.z += 0.05;
+        }
+    }
+
+    // Camera follow with slight bob
+    camera.position.x += (playerGroup.position.x + 2) * 0.01;
+    camera.position.y = 3 + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
+
+    // Camera shake
+    if (cameraShake > 0) {
+        camera.position.x += (Math.random() - 0.5) * cameraShake;
+        camera.position.y += (Math.random() - 0.5) * cameraShake * 0.5;
+        cameraShake *= 0.9;
+    }
+
+    updateParticles();
+    updateShockwaves();
+}
+
+function updateParticles() {
+    // Trail particles
+    for (let i = trailParticles.length - 1; i >= 0; i--) {
+        const p = trailParticles[i];
+        p.position.x += p.userData.vx;
+        p.position.y += p.userData.vy;
+        p.position.z += p.userData.vz;
+        p.userData.life -= p.userData.decay;
+        p.material.opacity = p.userData.life * 0.8;
+        p.scale.setScalar(p.userData.life);
+
+        if (p.userData.life <= 0) {
+            scene.remove(p);
+            trailParticles.splice(i, 1);
+        }
+    }
+
+    // Explosion particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.position.x += p.userData.vx;
+        p.position.y += p.userData.vy;
+        p.position.z += p.userData.vz;
+        p.userData.vy += p.userData.gravity || 0;
+        p.userData.life -= p.userData.decay;
+        p.material.opacity = p.userData.life;
+
+        if (p.userData.rotSpeed) {
+            p.rotation.x += p.userData.rotSpeed;
+            p.rotation.z += p.userData.rotSpeed * 0.7;
+        }
+
+        const s = p.userData.life;
+        p.scale.setScalar(s);
+
+        if (p.userData.life <= 0) {
+            scene.remove(p);
+            particles.splice(i, 1);
+        }
+    }
+}
+
+function updateShockwaves() {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.userData.life -= 0.02;
+        const scale = 1 + (1 - sw.userData.life) * 15;
+        sw.scale.set(scale, scale, scale);
+        sw.material.opacity = sw.userData.life * 0.6;
+
+        if (sw.userData.life <= 0) {
+            scene.remove(sw);
+            shockwaves.splice(i, 1);
+        }
+    }
+}
+
+// --- RESIZE ---
+function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// --- ANIMATE ---
+function animate() {
+    requestAnimationFrame(animate);
+    update();
+
+    // Background color pulse
+    const bgHue = (colorPhase * 0.5) % 1;
+    const bgColor = new THREE.Color().setHSL(bgHue, 0.3, 0.02);
+    scene.background = bgColor;
+    scene.fog.color.copy(bgColor);
+
+    renderer.render(scene, camera);
+}
+
+// --- START ---
+init();
+</script>
+</body>
+</html>
