@@ -232,8 +232,8 @@ let shockwaves = [];
 let gameRunning = false;
 let gameStarted = false;
 let isDead = false;
-let speed = 0.18;
-let baseSpeed = 0.18;
+let speed = 0.12;
+let baseSpeed = 0.12;
 let score = 0;
 let bestScore = 0;
 let attempts = 1;
@@ -241,8 +241,8 @@ let distance = 0;
 let totalLevelLength = 600;
 let jumpVelocity = 0;
 let isGrounded = true;
-let gravity = -0.010;
-let jumpForce = 0.26;
+let gravity = -0.014;
+let jumpForce = 0.20;
 let playerY = 0.6;
 let rotation = 0;
 let groundY = 0;
@@ -548,66 +548,81 @@ function generateLevel() {
         const currentSpeed = baseSpeed + difficulty * 0.04;
         const r = Math.random();
 
-        // Minimum gap = enough time to land and react before next jump
-        // At least 2.5 units at start, shrinking to 1.8 at max difficulty
-        const minReactGap = 2.5 - difficulty * 0.7;
+        // Big generous gaps - plenty of time to react
+        // 5 units at start, shrinking to 3.5 at max difficulty
+        const minReactGap = 5.0 - difficulty * 1.5;
 
         let groupObstacles = [];
 
-        if (r < 0.3) {
-            // Single spike
+        // First 20% of level: only single spikes (tutorial zone)
+        // Middle: mix of simple obstacles
+        // Last 30%: harder combos appear
+        if (difficulty < 0.2) {
+            // Tutorial zone - only single small spikes
             groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-        } else if (r < 0.5) {
-            // Block obstacle - cap height to be jumpable
-            const maxH = Math.min(0.8 + Math.random() * 1.0, maxJumpableHeight);
-            groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
-        } else if (r < 0.65) {
-            // Double spike - must fit within single jump arc
-            const spacing = 1.0 + Math.random() * 0.5;
-            groupObstacles = [
-                { type: 'spike', x: pos, y: 0 },
-                { type: 'spike', x: pos + spacing, y: 0 },
-            ];
-        } else if (r < 0.78) {
-            // Pillar - cap height to be jumpable
-            const maxH = Math.min(1.5 + Math.random() * 1.0, maxJumpableHeight);
-            groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
-        } else if (r < 0.88) {
-            // Saw blade - ensure it's low enough to jump over OR high enough to run under
-            const sawY = 1.2 + Math.random() * 0.6;
-            // Verify player can jump over it
-            if (sawY - 0.85 < maxJumpableHeight) {
-                groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
-            } else {
-                // Fallback to a spike
+        } else if (difficulty < 0.5) {
+            // Easy zone - single obstacles only
+            if (r < 0.5) {
                 groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            } else if (r < 0.8) {
+                const maxH = Math.min(0.6 + Math.random() * 0.4, maxJumpableHeight * 0.6);
+                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
+            } else {
+                const maxH = Math.min(1.0 + Math.random() * 0.5, maxJumpableHeight * 0.6);
+                groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
             }
-        } else {
-            // Combo section - spike + block + spike, all within one jump
-            const blockH = Math.min(0.8 + Math.random() * 0.4, maxJumpableHeight);
-            const span1 = 1.5 + Math.random() * 0.5;
-            const span2 = span1 + 1.5 + Math.random() * 0.5;
-            // Ensure total span fits within a single jump
-            if (span2 + 0.5 < maxClearSpan) {
+        } else if (difficulty < 0.7) {
+            // Medium zone - occasional doubles
+            if (r < 0.4) {
+                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            } else if (r < 0.6) {
+                const maxH = Math.min(0.7 + Math.random() * 0.5, maxJumpableHeight * 0.7);
+                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
+            } else if (r < 0.8) {
+                // Double spike with generous spacing
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0 },
-                    { type: 'block', x: pos + span1, y: 0, height: blockH },
-                    { type: 'spike', x: pos + span2, y: 0 },
+                    { type: 'spike', x: pos + 1.2, y: 0 },
                 ];
             } else {
-                // Too wide for one jump - just do a single spike
+                const sawY = 1.2 + Math.random() * 0.3;
+                groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
+            }
+        } else {
+            // Hard zone - combos possible
+            if (r < 0.3) {
                 groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            } else if (r < 0.5) {
+                const maxH = Math.min(0.8 + Math.random() * 0.5, maxJumpableHeight * 0.7);
+                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
+            } else if (r < 0.65) {
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'spike', x: pos + 1.0, y: 0 },
+                ];
+            } else if (r < 0.8) {
+                const maxH = Math.min(1.2 + Math.random() * 0.5, maxJumpableHeight * 0.7);
+                groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
+            } else if (r < 0.9) {
+                const sawY = 1.2 + Math.random() * 0.4;
+                groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
+            } else {
+                // Combo: spike + small block
+                const blockH = Math.min(0.6 + Math.random() * 0.3, maxJumpableHeight * 0.5);
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'block', x: pos + 1.5, y: 0, height: blockH },
+                ];
             }
         }
 
         // Verify the group is clearable
         if (!canClearGroup(groupObstacles, currentSpeed)) {
-            // Reduce heights until clearable
+            // Shrink everything and retry
             for (const obs of groupObstacles) {
-                if (obs.height) obs.height = Math.min(obs.height, maxJumpableHeight * 0.8);
-                if (obs.y && obs.type === 'saw') obs.y = Math.min(obs.y, 1.2);
+                if (obs.height) obs.height = Math.min(obs.height, maxJumpableHeight * 0.5);
+                if (obs.y && obs.type === 'saw') obs.y = Math.min(obs.y, 1.0);
             }
-            // If still not clearable with reduced group, just use single spike
             if (!canClearGroup(groupObstacles, currentSpeed)) {
                 groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
             }
@@ -620,9 +635,9 @@ function generateLevel() {
 
         // Calculate gap after this group
         const lastObs = groupObstacles[groupObstacles.length - 1];
-        const groupEnd = lastObs.x + (lastObs.type === 'spike' ? 0.4 : 0.5);
-        // Gap = landing distance + reaction time
-        const gap = minReactGap + Math.random() * (2.0 - difficulty * 1.0);
+        const groupEnd = lastObs.x + 0.5;
+        // Generous gap for landing + reaction
+        const gap = minReactGap + Math.random() * 2.0;
         pos = groupEnd + gap;
 
         // Decoration columns
@@ -1096,7 +1111,7 @@ function update() {
     document.getElementById('progress-bar').style.width = `${percent}%`;
 
     // Speed ramp
-    speed = baseSpeed + (distance / totalLevelLength) * 0.04;
+    speed = baseSpeed + (distance / totalLevelLength) * 0.03;
 
     // Color cycling
     colorPhase += 0.002;
