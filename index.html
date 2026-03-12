@@ -262,7 +262,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.9</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.9.1</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -1230,7 +1230,8 @@ function checkPlatformLanding() {
 
 // --- GAME LOGIC ---
 function startGame() {
-    showHitboxes = document.getElementById('hitbox-checkbox').checked;
+    const cb = document.getElementById('hitbox-checkbox');
+    if (cb) showHitboxes = cb.checked;
     if (hitboxMesh) hitboxMesh.visible = showHitboxes;
     updateObstacleHitboxes();
     document.getElementById('start-screen').style.display = 'none';
@@ -1430,13 +1431,13 @@ function update(dt) {
 
     playerGroup.position.y = playerY;
 
-    // Rotation - cube rolls exactly 90° per PLAYER_SIZE distance traveled
-    const distThisFrame = speed * dt;
-    const rotAngle = (distThisFrame / PLAYER_SIZE) * (Math.PI / 2);
-    rotation -= rotAngle;
-
-    if (isGrounded) {
-        // Snap to nearest 90° when on ground
+    // Rotation - cube rotates only when in the air (jumping)
+    if (!isGrounded) {
+        const distThisFrame = speed * dt;
+        const rotAngle = (distThisFrame / PLAYER_SIZE) * (Math.PI / 2);
+        rotation -= rotAngle;
+    } else {
+        // Snap to nearest 90° when grounded
         const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
         rotation += (target - rotation) * 0.3;
     }
