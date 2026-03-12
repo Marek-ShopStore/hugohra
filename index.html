@@ -50,6 +50,17 @@
             z-index: 20;
         }
 
+        #coin-display {
+            position: fixed;
+            top: 45px; right: 15px;
+            color: #ffd700;
+            font-size: clamp(14px, 3vw, 22px);
+            font-weight: 900;
+            text-shadow: 0 0 10px #ffd700, 0 0 20px #ff8800;
+            z-index: 20;
+            letter-spacing: 1px;
+        }
+
         #progress-bar-container {
             position: fixed;
             top: 0; left: 0;
@@ -239,6 +250,7 @@
 <body>
 
 <div id="score-display">0%</div>
+<div id="coin-display">0 / 5</div>
 <div id="attempt-display">Pokus #1</div>
 <div id="progress-bar-container"><div id="progress-bar"></div></div>
 
@@ -262,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.9.1</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.0</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -315,6 +327,9 @@ const IS_MOBILE = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini
 // Level data
 let levelData = [];
 let levelIndex = 0;
+let coins = [];
+let collectedCoins = 0;
+const TOTAL_COINS = 5;
 
 const PLAYER_SIZE = 0.55;
 const GROUND_LEVEL = 0.6;
@@ -605,7 +620,7 @@ function canClearGroup(groupObstacles, spd) {
     // Find the total horizontal span the player must clear
     let minX = Infinity, maxX = -Infinity;
     for (const obs of dangerousObs) {
-        const halfW = obs.type === 'spike' ? 0.4 : (obs.type === 'saw' ? 0.85 : 0.4);
+        const halfW = 0.4;
         minX = Math.min(minX, obs.x - halfW);
         maxX = Math.max(maxX, obs.x + halfW);
     }
@@ -620,13 +635,7 @@ function canClearGroup(groupObstacles, spd) {
             const dist = obs.x - jumpX;
             const playerH = arc.heightAtDist(dist);
             let requiredH;
-            if (obs.type === 'spike') {
-                requiredH = 0.6; // spike effective height from ground
-            } else if (obs.type === 'saw') {
-                requiredH = (obs.y || 2) - GROUND_LEVEL + 0.85;
-            } else {
-                requiredH = (obs.height || 1) - GROUND_LEVEL + 0.2;
-            }
+            requiredH = 0.6; // spike effective height from ground
             if (playerH < requiredH) {
                 clears = false;
                 break;
@@ -665,120 +674,120 @@ function generateLevel() {
 
         let groupObstacles = [];
 
-        // First 20% of level: only single spikes (tutorial zone)
-        // Middle: mix of simple obstacles
-        // Last 30%: harder combos appear
+        // Only spikes and platforms with spikes underneath
         if (difficulty < 0.2) {
-            // Tutorial zone - only single small spikes
+            // Tutorial zone - single spikes
             groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
         } else if (difficulty < 0.5) {
-            // Easy zone - single obstacles only
+            // Easy zone
             if (r < 0.4) {
                 groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            } else if (r < 0.6) {
-                const maxH = Math.min(0.6 + Math.random() * 0.4, maxJumpableHeight * 0.6);
-                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
-            } else if (r < 0.8) {
-                const maxH = Math.min(1.0 + Math.random() * 0.5, maxJumpableHeight * 0.6);
-                groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
-            } else {
-                // Platform staircase (2 steps going up)
-                const pw = 1.8 + Math.random() * 0.8;
-                const py1 = 0.9 + Math.random() * 0.3;
-                const py2 = py1 + 0.7 + Math.random() * 0.4;
-                groupObstacles = [
-                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py1 },
-                    { type: 'platform', x: pos + pw + 0.5, y: 0, width: pw, platformY: py2 },
-                ];
-            }
-        } else if (difficulty < 0.7) {
-            // Medium zone - occasional doubles
-            if (r < 0.25) {
-                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            } else if (r < 0.4) {
-                const maxH = Math.min(0.7 + Math.random() * 0.5, maxJumpableHeight * 0.7);
-                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
-            } else if (r < 0.55) {
-                // Double spike with generous spacing
+            } else if (r < 0.65) {
+                // Double spike
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0 },
                     { type: 'spike', x: pos + 1.2, y: 0 },
                 ];
-            } else if (r < 0.75) {
-                // Platform staircase (2-3 steps)
-                const steps = 2 + Math.floor(Math.random() * 2);
-                const pw = 1.8 + Math.random() * 0.8;
-                let py = 0.9 + Math.random() * 0.3;
-                groupObstacles = [];
-                for (let s = 0; s < steps; s++) {
-                    groupObstacles.push({ type: 'platform', x: pos + s * (pw + 0.4), y: 0, width: pw, platformY: py });
-                    py += 0.6 + Math.random() * 0.4;
-                }
-            } else if (r < 0.85) {
-                // Platform over spikes
-                const pw = 2.5 + Math.random() * 1.0;
-                const py = 1.2 + Math.random() * 0.5;
-                groupObstacles = [
-                    { type: 'spike', x: pos - 0.3, y: 0 },
-                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py },
-                    { type: 'spike', x: pos + 0.3, y: 0 },
-                ];
             } else {
-                const sawY = 1.2 + Math.random() * 0.3;
-                groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
+                // Platform with spikes underneath
+                const pw = 2.0 + Math.random() * 1.0;
+                const py = 1.2 + Math.random() * 0.3;
+                groupObstacles = [
+                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py },
+                    { type: 'spike', x: pos - pw/3, y: 0 },
+                    { type: 'spike', x: pos + pw/3, y: 0 },
+                ];
             }
-        } else {
-            // Hard zone - combos possible
-            if (r < 0.2) {
+        } else if (difficulty < 0.7) {
+            // Medium zone
+            if (r < 0.25) {
                 groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            } else if (r < 0.35) {
-                const maxH = Math.min(0.8 + Math.random() * 0.5, maxJumpableHeight * 0.7);
-                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
-            } else if (r < 0.5) {
+            } else if (r < 0.45) {
+                // Double spike
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0 },
                     { type: 'spike', x: pos + 1.0, y: 0 },
                 ];
-            } else if (r < 0.55) {
-                const maxH = Math.min(1.2 + Math.random() * 0.5, maxJumpableHeight * 0.7);
-                groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
             } else if (r < 0.65) {
-                const sawY = 1.2 + Math.random() * 0.4;
-                groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
-            } else if (r < 0.8) {
-                // Platform staircase (2-4 steps going up)
-                const steps = 2 + Math.floor(Math.random() * 3);
-                const pw = 1.6 + Math.random() * 0.8;
-                let py = 0.8 + Math.random() * 0.3;
-                groupObstacles = [];
-                for (let s = 0; s < steps; s++) {
-                    groupObstacles.push({ type: 'platform', x: pos + s * (pw + 0.3), y: 0, width: pw, platformY: py });
-                    py += 0.5 + Math.random() * 0.5;
-                }
-                // Add spikes under first platform
-                if (Math.random() < 0.5) {
-                    groupObstacles.push({ type: 'spike', x: pos, y: 0 });
-                }
-            } else {
-                // Combo: spike + small block
-                const blockH = Math.min(0.6 + Math.random() * 0.3, maxJumpableHeight * 0.5);
+                // Triple spike
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0 },
-                    { type: 'block', x: pos + 1.5, y: 0, height: blockH },
+                    { type: 'spike', x: pos + 1.0, y: 0 },
+                    { type: 'spike', x: pos + 2.0, y: 0 },
+                ];
+            } else if (r < 0.85) {
+                // Platform with spikes underneath
+                const pw = 2.5 + Math.random() * 1.0;
+                const py = 1.2 + Math.random() * 0.5;
+                const spikeCount = 2 + Math.floor(Math.random() * 2);
+                groupObstacles = [
+                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py },
+                ];
+                for (let s = 0; s < spikeCount; s++) {
+                    groupObstacles.push({ type: 'spike', x: pos - pw/2 + 0.5 + s * (pw / spikeCount), y: 0 });
+                }
+            } else {
+                // Spike then platform with spikes
+                const pw = 2.0 + Math.random() * 0.8;
+                const py = 1.2 + Math.random() * 0.4;
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'platform', x: pos + 2.5, y: 0, width: pw, platformY: py },
+                    { type: 'spike', x: pos + 2.5, y: 0 },
+                ];
+            }
+        } else {
+            // Hard zone
+            if (r < 0.2) {
+                // Double spike
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'spike', x: pos + 1.0, y: 0 },
+                ];
+            } else if (r < 0.4) {
+                // Triple spike
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'spike', x: pos + 0.9, y: 0 },
+                    { type: 'spike', x: pos + 1.8, y: 0 },
+                ];
+            } else if (r < 0.55) {
+                // Quad spike
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'spike', x: pos + 0.85, y: 0 },
+                    { type: 'spike', x: pos + 1.7, y: 0 },
+                    { type: 'spike', x: pos + 2.55, y: 0 },
+                ];
+            } else if (r < 0.75) {
+                // Platform staircase with spikes under each
+                const steps = 2 + Math.floor(Math.random() * 2);
+                const pw = 1.6 + Math.random() * 0.6;
+                let py = 0.9 + Math.random() * 0.3;
+                groupObstacles = [];
+                for (let s = 0; s < steps; s++) {
+                    const px = pos + s * (pw + 0.4);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
+                    groupObstacles.push({ type: 'spike', x: px, y: 0 });
+                    py += 0.5 + Math.random() * 0.4;
+                }
+            } else {
+                // Spike gauntlet: spike, platform+spikes, spike
+                const pw = 2.0 + Math.random() * 1.0;
+                const py = 1.2 + Math.random() * 0.5;
+                groupObstacles = [
+                    { type: 'spike', x: pos, y: 0 },
+                    { type: 'spike', x: pos + 1.0, y: 0 },
+                    { type: 'platform', x: pos + 3.0, y: 0, width: pw, platformY: py },
+                    { type: 'spike', x: pos + 2.5, y: 0 },
+                    { type: 'spike', x: pos + 3.5, y: 0 },
                 ];
             }
         }
 
         // Verify the group is clearable
         if (!canClearGroup(groupObstacles, currentSpeed)) {
-            // Shrink everything and retry
-            for (const obs of groupObstacles) {
-                if (obs.height) obs.height = Math.min(obs.height, maxJumpableHeight * 0.5);
-                if (obs.y && obs.type === 'saw') obs.y = Math.min(obs.y, 1.0);
-            }
-            if (!canClearGroup(groupObstacles, currentSpeed)) {
-                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            }
+            groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
         }
 
         // Add obstacles to level
@@ -809,6 +818,114 @@ function generateLevel() {
     for (const item of levelData) {
         createObstacle(item);
     }
+
+    // Place 5 coins at hard-to-reach locations
+    // Find platform obstacles and spike clusters to place coins near them
+    const coinPositions = [];
+    const spikeGroups = [];
+    const platforms = [];
+
+    for (const item of levelData) {
+        if (item.type === 'platform') platforms.push(item);
+        if (item.type === 'spike') spikeGroups.push(item);
+    }
+
+    // Strategy: place coins above spike clusters (need precise jump) and
+    // above platforms at extra height (need to jump from platform)
+    // Spread coins across the level
+    const sectionLength = totalLevelLength / (TOTAL_COINS + 1);
+
+    for (let i = 0; i < TOTAL_COINS; i++) {
+        const sectionStart = sectionLength * (i + 1) - sectionLength * 0.4;
+        const sectionEnd = sectionLength * (i + 1) + sectionLength * 0.4;
+
+        // Find obstacles in this section
+        const sectionSpikes = spikeGroups.filter(s => s.x >= sectionStart && s.x <= sectionEnd);
+        const sectionPlatforms = platforms.filter(p => p.x >= sectionStart && p.x <= sectionEnd);
+
+        let coinX, coinY;
+
+        if (sectionPlatforms.length > 0 && Math.random() < 0.5) {
+            // Place coin high above platform - need to jump from platform top
+            const plat = sectionPlatforms[Math.floor(Math.random() * sectionPlatforms.length)];
+            coinX = plat.x;
+            coinY = (plat.platformY || 1.2) + 1.8 + Math.random() * 0.5;
+        } else if (sectionSpikes.length >= 2) {
+            // Place coin between/above spike cluster - very risky to grab
+            const spike = sectionSpikes[Math.floor(Math.random() * sectionSpikes.length)];
+            coinX = spike.x + (Math.random() - 0.5) * 0.5;
+            coinY = 1.8 + Math.random() * 0.8;
+        } else if (sectionSpikes.length > 0) {
+            // Place coin directly above a spike - need perfect timing
+            const spike = sectionSpikes[Math.floor(Math.random() * sectionSpikes.length)];
+            coinX = spike.x;
+            coinY = 2.0 + Math.random() * 0.5;
+        } else {
+            // Fallback: place high up requiring a well-timed jump
+            coinX = (sectionStart + sectionEnd) / 2;
+            coinY = 2.5 + Math.random() * 0.5;
+        }
+
+        coinPositions.push({ x: coinX, y: coinY });
+    }
+
+    // Add spike guards near coins to make paths harder
+    for (const cp of coinPositions) {
+        // Add extra spikes around the coin approach path
+        if (Math.random() < 0.6) {
+            levelData.push({ type: 'spike', x: cp.x - 1.2, y: 0 });
+            createObstacle({ type: 'spike', x: cp.x - 1.2, y: 0 });
+        }
+        if (Math.random() < 0.6) {
+            levelData.push({ type: 'spike', x: cp.x + 1.2, y: 0 });
+            createObstacle({ type: 'spike', x: cp.x + 1.2, y: 0 });
+        }
+        createCoin(cp.x, cp.y);
+    }
+}
+
+function createCoin(x, y) {
+    const coinGroup = new THREE.Group();
+
+    // Main coin disc
+    const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 16);
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0xffd700,
+        emissive: 0xffaa00,
+        emissiveIntensity: 1.0,
+        metalness: 0.9,
+        roughness: 0.1,
+    });
+    const coinMesh = new THREE.Mesh(geo, mat);
+    coinMesh.rotation.z = Math.PI / 2;
+    coinGroup.add(coinMesh);
+
+    // Inner star/circle detail
+    const innerGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 6);
+    const innerMat = new THREE.MeshBasicMaterial({
+        color: 0xffee44,
+        transparent: true,
+        opacity: 0.8,
+    });
+    const inner = new THREE.Mesh(innerGeo, innerMat);
+    inner.rotation.z = Math.PI / 2;
+    coinGroup.add(inner);
+
+    // Glow
+    const glowGeo = new THREE.SphereGeometry(0.45, 12, 8);
+    const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xffd700,
+        transparent: true,
+        opacity: 0.15,
+        blending: THREE.AdditiveBlending,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    coinGroup.add(glow);
+
+    coinGroup.position.set(x, y, 0);
+    coinGroup.userData = { type: 'coin', collected: false };
+    scene.add(coinGroup);
+    coins.push(coinGroup);
 }
 
 // --- OBSTACLES ---
@@ -1228,6 +1345,47 @@ function checkPlatformLanding() {
     return null;
 }
 
+function checkCoinCollection() {
+    const px = playerGroup.position.x;
+    const py = playerGroup.position.y;
+    const collectRadius = 0.7;
+
+    for (const coin of coins) {
+        if (coin.userData.collected) continue;
+        const dx = px - coin.position.x;
+        const dy = py - coin.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < collectRadius) {
+            coin.userData.collected = true;
+            coin.visible = false;
+            collectedCoins++;
+            document.getElementById('coin-display').textContent = `${collectedCoins} / ${TOTAL_COINS}`;
+
+            // Collection effect - gold particles
+            for (let i = 0; i < 15; i++) {
+                const pGeo = new THREE.SphereGeometry(0.08, 4, 4);
+                const pMat = new THREE.MeshBasicMaterial({
+                    color: 0xffd700,
+                    transparent: true,
+                    opacity: 0.9,
+                });
+                const p = new THREE.Mesh(pGeo, pMat);
+                p.position.set(coin.position.x, coin.position.y, coin.position.z);
+                p.userData = {
+                    vx: (Math.random() - 0.5) * 0.15,
+                    vy: Math.random() * 0.15,
+                    vz: (Math.random() - 0.5) * 0.15,
+                    life: 1.0,
+                    rotSpeed: Math.random() * 0.2,
+                };
+                scene.add(p);
+                particles.push(p);
+            }
+        }
+    }
+}
+
 // --- GAME LOGIC ---
 function startGame() {
     const cb = document.getElementById('hitbox-checkbox');
@@ -1276,6 +1434,9 @@ function restartGame() {
     for (const g of groundTiles) {
         scene.remove(g);
     }
+    for (const c of coins) {
+        scene.remove(c);
+    }
 
     obstacles = [];
     decorations = [];
@@ -1283,6 +1444,9 @@ function restartGame() {
     trailParticles = [];
     shockwaves = [];
     groundTiles = [];
+    coins = [];
+    collectedCoins = 0;
+    document.getElementById('coin-display').textContent = `0 / ${TOTAL_COINS}`;
 
     // Recreate
     createGround();
@@ -1328,7 +1492,7 @@ function die() {
 
     setTimeout(() => {
         document.getElementById('death-screen').style.display = 'flex';
-        document.getElementById('death-score').textContent = `Skóre: ${percent}%`;
+        document.getElementById('death-score').textContent = `Skóre: ${percent}% | Coiny: ${collectedCoins}/${TOTAL_COINS}`;
         document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
     }, 800);
 }
@@ -1471,6 +1635,16 @@ function update(dt) {
         return;
     }
 
+    // Coin collection
+    checkCoinCollection();
+
+    // Animate coins (spin + bob)
+    for (const coin of coins) {
+        if (coin.userData.collected) continue;
+        coin.rotation.y += 0.03 * dt;
+        coin.position.y += Math.sin(Date.now() * 0.003 + coin.position.x) * 0.002;
+    }
+
     // Win condition
     if (distance >= totalLevelLength) {
         // Victory explosion!
@@ -1492,7 +1666,7 @@ function update(dt) {
             document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
             document.getElementById('death-screen').querySelector('h2').style.color = '#0f0';
             document.getElementById('death-screen').querySelector('h2').style.textShadow = '0 0 20px #0f0, 0 0 40px #0f0';
-            document.getElementById('death-score').textContent = `Skóre: 100%`;
+            document.getElementById('death-score').textContent = `Skóre: 100% | Coiny: ${collectedCoins}/${TOTAL_COINS}`;
             document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
         }, 1200);
     }
