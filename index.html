@@ -220,7 +220,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.7</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.8</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -541,9 +541,12 @@ function calcJumpArc(spd) {
 // Check if an obstacle group is clearable with a single jump
 function canClearGroup(groupObstacles, spd) {
     const arc = calcJumpArc(spd);
+    // Filter out platforms - they're safe
+    const dangerousObs = groupObstacles.filter(o => o.type !== 'platform');
+    if (dangerousObs.length === 0) return true;
     // Find the total horizontal span the player must clear
     let minX = Infinity, maxX = -Infinity;
-    for (const obs of groupObstacles) {
+    for (const obs of dangerousObs) {
         const halfW = obs.type === 'spike' ? 0.4 : (obs.type === 'saw' ? 0.85 : 0.4);
         minX = Math.min(minX, obs.x - halfW);
         maxX = Math.max(maxX, obs.x + halfW);
@@ -555,7 +558,7 @@ function canClearGroup(groupObstacles, spd) {
     for (let jumpOffset = 0.3; jumpOffset < 2.5; jumpOffset += 0.2) {
         const jumpX = minX - jumpOffset;
         let clears = true;
-        for (const obs of groupObstacles) {
+        for (const obs of dangerousObs) {
             const dist = obs.x - jumpX;
             const playerH = arc.heightAtDist(dist);
             let requiredH;
@@ -612,28 +615,36 @@ function generateLevel() {
             groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
         } else if (difficulty < 0.5) {
             // Easy zone - single obstacles only
-            if (r < 0.5) {
-                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            } else if (r < 0.8) {
-                const maxH = Math.min(0.6 + Math.random() * 0.4, maxJumpableHeight * 0.6);
-                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
-            } else {
-                const maxH = Math.min(1.0 + Math.random() * 0.5, maxJumpableHeight * 0.6);
-                groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
-            }
-        } else if (difficulty < 0.7) {
-            // Medium zone - occasional doubles
             if (r < 0.4) {
                 groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
             } else if (r < 0.6) {
-                const maxH = Math.min(0.7 + Math.random() * 0.5, maxJumpableHeight * 0.7);
+                const maxH = Math.min(0.6 + Math.random() * 0.4, maxJumpableHeight * 0.6);
                 groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
             } else if (r < 0.8) {
+                const maxH = Math.min(1.0 + Math.random() * 0.5, maxJumpableHeight * 0.6);
+                groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
+            } else {
+                const pw = 1.8 + Math.random() * 1.0;
+                const py = 1.0 + Math.random() * 0.5;
+                groupObstacles = [{ type: 'platform', x: pos, y: 0, width: pw, platformY: py }];
+            }
+        } else if (difficulty < 0.7) {
+            // Medium zone - occasional doubles
+            if (r < 0.3) {
+                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            } else if (r < 0.5) {
+                const maxH = Math.min(0.7 + Math.random() * 0.5, maxJumpableHeight * 0.7);
+                groupObstacles = [{ type: 'block', x: pos, y: 0, height: maxH }];
+            } else if (r < 0.65) {
                 // Double spike with generous spacing
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0 },
                     { type: 'spike', x: pos + 1.2, y: 0 },
                 ];
+            } else if (r < 0.8) {
+                const pw = 2.0 + Math.random() * 1.2;
+                const py = 1.2 + Math.random() * 0.6;
+                groupObstacles = [{ type: 'platform', x: pos, y: 0, width: pw, platformY: py }];
             } else {
                 const sawY = 1.2 + Math.random() * 0.3;
                 groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
@@ -650,12 +661,20 @@ function generateLevel() {
                     { type: 'spike', x: pos, y: 0 },
                     { type: 'spike', x: pos + 1.0, y: 0 },
                 ];
-            } else if (r < 0.8) {
+            } else if (r < 0.7) {
                 const maxH = Math.min(1.2 + Math.random() * 0.5, maxJumpableHeight * 0.7);
                 groupObstacles = [{ type: 'pillar', x: pos, y: 0, height: maxH }];
-            } else if (r < 0.9) {
+            } else if (r < 0.8) {
                 const sawY = 1.2 + Math.random() * 0.4;
                 groupObstacles = [{ type: 'saw', x: pos, y: sawY }];
+            } else if (r < 0.9) {
+                // Platform with spike underneath or nearby
+                const pw = 2.0 + Math.random() * 1.5;
+                const py = 1.3 + Math.random() * 0.7;
+                groupObstacles = [
+                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py },
+                    { type: 'spike', x: pos, y: 0 },
+                ];
             } else {
                 // Combo: spike + small block
                 const blockH = Math.min(0.6 + Math.random() * 0.3, maxJumpableHeight * 0.5);
@@ -808,6 +827,46 @@ function createObstacle(data) {
         }
 
         mesh.userData = { type: 'saw', radius: 0.85, spinning: true };
+    } else if (data.type === 'platform') {
+        const w = data.width || 2.0;
+        const h = data.height || 0.35;
+        const platformY = data.platformY || 1.2;
+        const geo = new THREE.BoxGeometry(w, h, 1.0);
+        const greenColors = [0x00cc44, 0x00ee55, 0x22dd44, 0x00ff66, 0x11cc33];
+        const gColor = greenColors[Math.floor(Math.random() * greenColors.length)];
+        const mat = new THREE.MeshStandardMaterial({
+            color: gColor,
+            emissive: gColor,
+            emissiveIntensity: 0.6,
+            metalness: 0.5,
+            roughness: 0.3,
+        });
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(data.x, platformY, 0);
+        mesh.castShadow = true;
+
+        // Top glow line
+        const glowGeo = new THREE.BoxGeometry(w + 0.1, 0.05, 1.1);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0x44ff88,
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending,
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.position.set(data.x, platformY + h / 2 + 0.03, 0);
+        scene.add(glow);
+        decorations.push(glow);
+
+        // Wireframe
+        const wireGeo = new THREE.BoxGeometry(w + 0.05, h + 0.05, 1.05);
+        const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.12 });
+        const wire = new THREE.Mesh(wireGeo, wireMat);
+        wire.position.copy(mesh.position);
+        scene.add(wire);
+        decorations.push(wire);
+
+        mesh.userData = { type: 'platform', width: w, height: h, platformY: platformY };
     }
 
     if (mesh) {
@@ -1010,8 +1069,36 @@ function checkCollision() {
                 return true;
             }
         }
+        // Platforms are NOT deadly - handled in physics
     }
     return false;
+}
+
+// Check if player is landing on a platform (returns platform top Y or null)
+function checkPlatformLanding() {
+    const px = playerGroup.position.x;
+    const py = playerY;
+    const halfSize = PLAYER_SIZE * 0.32;
+
+    for (const obs of obstacles) {
+        const ud = obs.userData;
+        if (ud.type !== 'platform') continue;
+
+        const ox = obs.position.x;
+        const w = (ud.width || 2.0) / 2;
+        const h = ud.height || 0.35;
+        const platTop = ud.platformY + h / 2;
+        const platBottom = ud.platformY - h / 2;
+
+        // Check horizontal overlap
+        if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05) {
+            // Player is falling and feet are near platform top
+            if (jumpVelocity <= 0 && py - halfSize <= platTop + 0.15 && py - halfSize >= platBottom - 0.1) {
+                return platTop + halfSize + 0.02;
+            }
+        }
+    }
+    return null;
 }
 
 // --- GAME LOGIC ---
@@ -1185,6 +1272,15 @@ function update(dt) {
         jumpVelocity += gravity * dt;
         playerY += jumpVelocity * dt;
 
+        // Check platform landing
+        const platformTop = checkPlatformLanding();
+        if (platformTop !== null && jumpVelocity <= 0) {
+            playerY = platformTop;
+            jumpVelocity = 0;
+            isGrounded = true;
+            spawnJumpBurst();
+        }
+
         if (playerY <= GROUND_LEVEL) {
             playerY = GROUND_LEVEL;
             jumpVelocity = 0;
@@ -1192,6 +1288,12 @@ function update(dt) {
 
             // Land effect
             spawnJumpBurst();
+        }
+    } else if (playerY > GROUND_LEVEL + 0.1) {
+        // If standing on platform, check if still on it
+        const platformTop = checkPlatformLanding();
+        if (platformTop === null) {
+            isGrounded = false;
         }
     }
 
