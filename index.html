@@ -274,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.4</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.5</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -852,38 +852,26 @@ function generateLevel() {
 
 function createCoin(x, y) {
     const coinGroup = new THREE.Group();
+    const size = PLAYER_SIZE;
 
-    // Main coin disc - same size as player cube
-    const coinRadius = PLAYER_SIZE / 2;
-    const geo = new THREE.CylinderGeometry(coinRadius, coinRadius, 0.1, 20);
+    // Solid bright yellow box - same size as player, always visible
+    const geo = new THREE.BoxGeometry(size, size, size);
     const mat = new THREE.MeshStandardMaterial({
-        color: 0xffdd00,
-        emissive: 0xffcc00,
-        emissiveIntensity: 1.5,
-        metalness: 0.95,
-        roughness: 0.05,
+        color: 0xffd700,
+        emissive: 0xffaa00,
+        emissiveIntensity: 2.0,
+        metalness: 0.8,
+        roughness: 0.1,
     });
-    const coinMesh = new THREE.Mesh(geo, mat);
-    coinMesh.rotation.x = Math.PI / 2;
-    coinGroup.add(coinMesh);
+    const cube = new THREE.Mesh(geo, mat);
+    coinGroup.add(cube);
 
-    // Inner star detail
-    const innerGeo = new THREE.CylinderGeometry(coinRadius * 0.45, coinRadius * 0.45, 0.12, 5);
-    const innerMat = new THREE.MeshBasicMaterial({
-        color: 0xffff44,
-        transparent: true,
-        opacity: 0.9,
-    });
-    const inner = new THREE.Mesh(innerGeo, innerMat);
-    inner.rotation.x = Math.PI / 2;
-    coinGroup.add(inner);
-
-    // Glow
-    const glowGeo = new THREE.SphereGeometry(coinRadius * 1.5, 12, 8);
+    // Bright glow sphere around it
+    const glowGeo = new THREE.SphereGeometry(size, 12, 8);
     const glowMat = new THREE.MeshBasicMaterial({
         color: 0xffdd00,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.25,
         blending: THREE.AdditiveBlending,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
@@ -1597,11 +1585,12 @@ function update(dt) {
     // Coin collection
     checkCoinCollection();
 
-    // Animate coins (spin + bob)
+    // Animate coins (slow spin + bob)
     for (const coin of coins) {
         if (coin.userData.collected) continue;
-        coin.rotation.y += 0.03 * dt;
-        coin.position.y += Math.sin(Date.now() * 0.003 + coin.position.x) * 0.002;
+        coin.rotation.y += 0.02 * dt;
+        coin.rotation.x += 0.01 * dt;
+        coin.children[0].position.y = Math.sin(Date.now() * 0.003 + coin.position.x) * 0.15;
     }
 
     // Win condition
