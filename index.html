@@ -211,6 +211,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.6</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -254,6 +255,8 @@ let obstacleTimer = 0;
 let difficultyRamp = 0;
 let comboCount = 0;
 let lastObstaclePassed = -999;
+let lastTime = 0;
+const TARGET_FPS = 60;
 
 // Level data
 let levelData = [];
@@ -979,6 +982,7 @@ function startGame() {
     speed = baseSpeed;
     comboCount = 0;
     colorPhase = 0;
+    lastTime = 0;
 
     playerGroup.position.set(0, GROUND_LEVEL, 0);
     player.rotation.set(0, 0, 0);
@@ -1077,35 +1081,36 @@ function onKeyUp(e) {
 }
 
 // --- UPDATE ---
-function update() {
+function update(dt) {
+    if (!dt) dt = 1;
     if (!gameStarted) {
         // Idle animation
-        colorPhase += 0.003;
+        colorPhase += 0.003 * dt;
         const idleColor = new THREE.Color().setHSL(colorPhase % 1, 1, 0.5);
         player.material.color.copy(idleColor);
         player.material.emissive.copy(idleColor);
-        playerGroup.rotation.y += 0.02;
+        playerGroup.rotation.y += 0.02 * dt;
         playerGroup.position.y = GROUND_LEVEL + Math.sin(Date.now() * 0.002) * 0.3;
         return;
     }
 
     if (!gameRunning) {
         // Update particles even when dead
-        updateParticles();
-        updateShockwaves();
+        updateParticles(dt);
+        updateShockwaves(dt);
 
         // Camera shake on death
         if (cameraShake > 0) {
             camera.position.x = playerGroup.position.x + (Math.random() - 0.5) * cameraShake;
             camera.position.y = 3 + (Math.random() - 0.5) * cameraShake;
-            cameraShake *= 0.92;
+            cameraShake *= Math.pow(0.92, dt);
             if (cameraShake < 0.01) cameraShake = 0;
         }
         return;
     }
 
     // --- MOVEMENT ---
-    distance += speed;
+    distance += speed * dt;
     const percent = Math.min(Math.floor((distance / totalLevelLength) * 100), 100);
     document.getElementById('score-display').textContent = `${percent}%`;
     document.getElementById('progress-bar').style.width = `${percent}%`;
@@ -1114,7 +1119,7 @@ function update() {
     speed = baseSpeed + (distance / totalLevelLength) * 0.03;
 
     // Color cycling
-    colorPhase += 0.002;
+    colorPhase += 0.002 * dt;
     const playerColor = new THREE.Color().setHSL((colorPhase * 2) % 1, 1, 0.5);
     player.material.color.copy(playerColor);
     player.material.emissive.copy(playerColor);
@@ -1129,8 +1134,8 @@ function update() {
 
     // Gravity
     if (!isGrounded) {
-        jumpVelocity += gravity;
-        playerY += jumpVelocity;
+        jumpVelocity += gravity * dt;
+        playerY += jumpVelocity * dt;
 
         if (playerY <= GROUND_LEVEL) {
             playerY = GROUND_LEVEL;
@@ -1148,27 +1153,28 @@ function update() {
     // One full 90° turn per cube-width of distance traveled
     const rotSpeed = speed / PLAYER_SIZE * (Math.PI / 2);
     if (!isGrounded) {
-        rotation -= rotSpeed;
+        rotation -= rotSpeed * dt;
     } else {
         // Snap rotation to nearest 90 degrees when grounded
         const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
-        rotation += (target - rotation) * 0.3;
+        rotation += (target - rotation) * (1 - Math.pow(0.7, dt));
     }
     player.rotation.z = rotation;
 
     // Move world (obstacles come from right to left)
+    const moveAmount = speed * dt;
     for (const obs of obstacles) {
-        obs.position.x -= speed;
+        obs.position.x -= moveAmount;
     }
     for (const dec of decorations) {
-        if (dec.position) dec.position.x -= speed;
+        if (dec.position) dec.position.x -= moveAmount;
     }
     for (const g of groundTiles) {
-        g.position.x -= speed;
+        g.position.x -= moveAmount;
     }
 
     // Beat pulse effect
-    beatPulse *= 0.95;
+    beatPulse *= Math.pow(0.95, dt);
     const scaleFactor = 1 + beatPulse * 0.1;
     playerGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
@@ -1212,7 +1218,7 @@ function update() {
     // Obstacles spinning
     for (const obs of obstacles) {
         if (obs.userData.spinning) {
-            obs.rotation.z += 0.05;
+            obs.rotation.z += 0.05 * dt;
         }
     }
 
@@ -1224,21 +1230,22 @@ function update() {
     if (cameraShake > 0) {
         camera.position.x += (Math.random() - 0.5) * cameraShake;
         camera.position.y += (Math.random() - 0.5) * cameraShake * 0.5;
-        cameraShake *= 0.9;
+        cameraShake *= Math.pow(0.9, dt);
     }
 
-    updateParticles();
-    updateShockwaves();
+    updateParticles(dt);
+    updateShockwaves(dt);
 }
 
-function updateParticles() {
+function updateParticles(dt) {
+    if (!dt) dt = 1;
     // Trail particles
     for (let i = trailParticles.length - 1; i >= 0; i--) {
         const p = trailParticles[i];
-        p.position.x += p.userData.vx;
-        p.position.y += p.userData.vy;
-        p.position.z += p.userData.vz;
-        p.userData.life -= p.userData.decay;
+        p.position.x += p.userData.vx * dt;
+        p.position.y += p.userData.vy * dt;
+        p.position.z += p.userData.vz * dt;
+        p.userData.life -= p.userData.decay * dt;
         p.material.opacity = p.userData.life * 0.8;
         p.scale.setScalar(p.userData.life);
 
@@ -1251,16 +1258,16 @@ function updateParticles() {
     // Explosion particles
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.position.x += p.userData.vx;
-        p.position.y += p.userData.vy;
-        p.position.z += p.userData.vz;
-        p.userData.vy += p.userData.gravity || 0;
-        p.userData.life -= p.userData.decay;
+        p.position.x += p.userData.vx * dt;
+        p.position.y += p.userData.vy * dt;
+        p.position.z += p.userData.vz * dt;
+        p.userData.vy += (p.userData.gravity || 0) * dt;
+        p.userData.life -= p.userData.decay * dt;
         p.material.opacity = p.userData.life;
 
         if (p.userData.rotSpeed) {
-            p.rotation.x += p.userData.rotSpeed;
-            p.rotation.z += p.userData.rotSpeed * 0.7;
+            p.rotation.x += p.userData.rotSpeed * dt;
+            p.rotation.z += p.userData.rotSpeed * 0.7 * dt;
         }
 
         const s = p.userData.life;
@@ -1273,10 +1280,11 @@ function updateParticles() {
     }
 }
 
-function updateShockwaves() {
+function updateShockwaves(dt) {
+    if (!dt) dt = 1;
     for (let i = shockwaves.length - 1; i >= 0; i--) {
         const sw = shockwaves[i];
-        sw.userData.life -= 0.02;
+        sw.userData.life -= 0.02 * dt;
         const scale = 1 + (1 - sw.userData.life) * 15;
         sw.scale.set(scale, scale, scale);
         sw.material.opacity = sw.userData.life * 0.6;
@@ -1296,9 +1304,16 @@ function onResize() {
 }
 
 // --- ANIMATE ---
-function animate() {
+function animate(timestamp) {
     requestAnimationFrame(animate);
-    update();
+
+    if (!lastTime) lastTime = timestamp;
+    const rawDt = (timestamp - lastTime) / (1000 / TARGET_FPS);
+    lastTime = timestamp;
+    // Clamp delta so big lag spikes don't cause huge jumps
+    const dt = Math.min(rawDt, 3);
+
+    update(dt);
 
     // Background color pulse
     const bgHue = (colorPhase * 0.5) % 1;
