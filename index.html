@@ -274,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.1</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.2</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -302,11 +302,11 @@ let score = 0;
 let bestScore = 0;
 let attempts = 1;
 let distance = 0;
-let totalLevelLength = 600;
+let totalLevelLength = 900;
 let jumpVelocity = 0;
 let isGrounded = true;
-let gravity = -0.014;
-let jumpForce = 0.20;
+let gravity = -0.012;
+let jumpForce = 0.24;
 let playerY = 0.6;
 let rotation = 0;
 let groundY = 0;
@@ -908,40 +908,53 @@ function generateLevel() {
 function createCoin(x, y) {
     const coinGroup = new THREE.Group();
 
-    // Main coin disc
-    const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.08, 16);
+    // Main coin disc - BIG and YELLOW
+    const geo = new THREE.CylinderGeometry(0.55, 0.55, 0.12, 20);
     const mat = new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        emissive: 0xffaa00,
-        emissiveIntensity: 1.0,
-        metalness: 0.9,
-        roughness: 0.1,
+        color: 0xffdd00,
+        emissive: 0xffcc00,
+        emissiveIntensity: 1.5,
+        metalness: 0.95,
+        roughness: 0.05,
     });
     const coinMesh = new THREE.Mesh(geo, mat);
     coinMesh.rotation.z = Math.PI / 2;
     coinGroup.add(coinMesh);
 
-    // Inner star/circle detail
-    const innerGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 6);
+    // Inner star detail
+    const innerGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.14, 5);
     const innerMat = new THREE.MeshBasicMaterial({
-        color: 0xffee44,
+        color: 0xffff44,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
     });
     const inner = new THREE.Mesh(innerGeo, innerMat);
     inner.rotation.z = Math.PI / 2;
     coinGroup.add(inner);
 
-    // Glow
-    const glowGeo = new THREE.SphereGeometry(0.45, 12, 8);
+    // Big bright glow
+    const glowGeo = new THREE.SphereGeometry(0.8, 12, 8);
     const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xffd700,
+        color: 0xffdd00,
         transparent: true,
-        opacity: 0.15,
+        opacity: 0.2,
         blending: THREE.AdditiveBlending,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
     coinGroup.add(glow);
+
+    // Extra outer glow ring
+    const ringGeo = new THREE.RingGeometry(0.6, 0.75, 20);
+    const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xffee00,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.z = Math.PI / 2;
+    coinGroup.add(ring);
 
     coinGroup.position.set(x, y, 0);
     coinGroup.userData = { type: 'coin', collected: false };
@@ -1362,7 +1375,7 @@ function checkPlatformLanding() {
 function checkCoinCollection() {
     const px = playerGroup.position.x;
     const py = playerGroup.position.y;
-    const collectRadius = 0.7;
+    const collectRadius = 0.9;
 
     for (const coin of coins) {
         if (coin.userData.collected) continue;
@@ -1611,8 +1624,8 @@ function update(dt) {
 
     // Rotation - cube rotates forward only when in the air (small rotation)
     if (!isGrounded) {
-        const rotAngle = 0.04 * dt; // slow gentle forward spin
-        rotation -= rotAngle;
+        const rotAngle = 0.04 * dt; // gentle backward spin
+        rotation += rotAngle;
     } else {
         // Snap to nearest 90° when grounded
         const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
