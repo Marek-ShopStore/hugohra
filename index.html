@@ -918,7 +918,7 @@ function createCoin(x, y) {
         roughness: 0.05,
     });
     const coinMesh = new THREE.Mesh(geo, mat);
-    coinMesh.rotation.z = Math.PI / 2;
+    coinMesh.rotation.x = Math.PI / 2;
     coinGroup.add(coinMesh);
 
     // Inner star detail
@@ -929,7 +929,7 @@ function createCoin(x, y) {
         opacity: 0.9,
     });
     const inner = new THREE.Mesh(innerGeo, innerMat);
-    inner.rotation.z = Math.PI / 2;
+    inner.rotation.x = Math.PI / 2;
     coinGroup.add(inner);
 
     // Big bright glow
@@ -953,7 +953,7 @@ function createCoin(x, y) {
         blending: THREE.AdditiveBlending,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.z = Math.PI / 2;
+    ring.rotation.x = Math.PI / 2;
     coinGroup.add(ring);
 
     coinGroup.position.set(x, y, 0);
