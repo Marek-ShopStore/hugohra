@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Geometry Dash - Na Steroidech!</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,8 +11,15 @@
             background: #000;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             cursor: default;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
-        canvas { display: block; }
+        canvas { display: block; touch-action: none; }
 
         #ui-overlay {
             position: fixed;
@@ -24,9 +31,9 @@
 
         #score-display {
             position: fixed;
-            top: 20px; right: 30px;
+            top: 15px; right: 15px;
             color: #fff;
-            font-size: 28px;
+            font-size: clamp(18px, 4vw, 28px);
             font-weight: 900;
             text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #08f;
             z-index: 20;
@@ -35,9 +42,9 @@
 
         #attempt-display {
             position: fixed;
-            top: 20px; left: 30px;
+            top: 15px; left: 15px;
             color: #fff;
-            font-size: 18px;
+            font-size: clamp(13px, 2.5vw, 18px);
             font-weight: 700;
             text-shadow: 0 0 10px #f0f, 0 0 20px #f0f;
             z-index: 20;
@@ -75,7 +82,7 @@
         }
 
         #start-screen h1 {
-            font-size: 72px;
+            font-size: clamp(36px, 10vw, 72px);
             font-weight: 900;
             background: linear-gradient(135deg, #0ff, #f0f, #ff0, #0f0);
             background-size: 300% 300%;
@@ -88,22 +95,24 @@
         }
 
         #start-screen .subtitle {
-            font-size: 22px;
+            font-size: clamp(14px, 3vw, 22px);
             color: #888;
-            margin-bottom: 50px;
+            margin-bottom: clamp(20px, 5vw, 50px);
             letter-spacing: 6px;
             text-transform: uppercase;
         }
 
         #start-screen .controls-info {
-            font-size: 16px;
+            font-size: clamp(11px, 2.5vw, 16px);
             color: #666;
-            margin-bottom: 30px;
+            margin-bottom: clamp(15px, 3vw, 30px);
+            padding: 0 15px;
+            text-align: center;
         }
 
         .start-btn {
-            padding: 18px 60px;
-            font-size: 24px;
+            padding: clamp(12px, 2.5vw, 18px) clamp(30px, 8vw, 60px);
+            font-size: clamp(16px, 3.5vw, 24px);
             font-weight: 800;
             border: 2px solid #0ff;
             background: transparent;
@@ -142,7 +151,7 @@
         }
 
         #death-screen h2 {
-            font-size: 56px;
+            font-size: clamp(32px, 8vw, 56px);
             color: #f33;
             font-weight: 900;
             text-shadow: 0 0 20px #f00, 0 0 40px #f00;
@@ -151,15 +160,15 @@
         }
 
         #death-screen .death-score {
-            font-size: 28px;
+            font-size: clamp(18px, 4vw, 28px);
             color: #fff;
             margin-bottom: 10px;
         }
 
         #death-screen .death-percent {
-            font-size: 20px;
+            font-size: clamp(14px, 3vw, 20px);
             color: #888;
-            margin-bottom: 40px;
+            margin-bottom: clamp(20px, 5vw, 40px);
         }
 
         @keyframes gradientShift {
@@ -199,7 +208,7 @@
 <div id="start-screen">
     <h1>GEOMETRY DASH</h1>
     <div class="subtitle">Na Steroidech</div>
-    <div class="controls-info">MEZERNÍK / KLIK = Skok &nbsp;|&nbsp; NAHORU = Skok &nbsp;|&nbsp; Drž pro multi-skok</div>
+    <div class="controls-info" id="controls-info"></div>
     <button class="start-btn" id="start-btn">START</button>
 </div>
 
@@ -211,7 +220,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.6</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v0.7</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -257,6 +266,7 @@ let comboCount = 0;
 let lastObstaclePassed = -999;
 let lastTime = 0;
 const TARGET_FPS = 60;
+const IS_MOBILE = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (('ontouchstart' in window) && window.innerWidth < 1024);
 
 // Level data
 let levelData = [];
@@ -276,8 +286,8 @@ function init() {
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
+    renderer.shadowMap.enabled = !IS_MOBILE;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
@@ -314,17 +324,53 @@ function init() {
     // Generate level
     generateLevel();
 
+    // Detect touch device
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+    // Show appropriate controls info
+    const controlsInfo = document.getElementById('controls-info');
+    if (isTouchDevice) {
+        controlsInfo.textContent = 'DOTKNI SE OBRAZOVKY = Skok | Drž pro multi-skok';
+    } else {
+        controlsInfo.textContent = 'MEZERNÍK / KLIK = Skok | NAHORU = Skok | Drž pro multi-skok';
+    }
+
     // Events
     window.addEventListener('resize', onResize);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('mousedown', () => { jumpPressed = true; });
-    window.addEventListener('mouseup', () => { jumpPressed = false; });
-    window.addEventListener('touchstart', (e) => { e.preventDefault(); jumpPressed = true; }, { passive: false });
-    window.addEventListener('touchend', () => { jumpPressed = false; });
 
-    document.getElementById('start-btn').addEventListener('click', startGame);
-    document.getElementById('retry-btn').addEventListener('click', restartGame);
+    // Mouse events (for desktop)
+    window.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.start-btn')) return;
+        jumpPressed = true;
+    });
+    window.addEventListener('mouseup', () => { jumpPressed = false; });
+
+    // Touch events (for mobile/tablet)
+    window.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.start-btn')) return;
+        e.preventDefault();
+        jumpPressed = true;
+    }, { passive: false });
+    window.addEventListener('touchend', (e) => {
+        if (e.target.closest('.start-btn')) return;
+        e.preventDefault();
+        jumpPressed = false;
+    }, { passive: false });
+
+    // Prevent double-tap zoom and other mobile gestures
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+    document.addEventListener('gestureend', (e) => e.preventDefault());
+
+    // Buttons - use both click and touchend for reliability
+    const startBtn = document.getElementById('start-btn');
+    const retryBtn = document.getElementById('retry-btn');
+    startBtn.addEventListener('click', startGame);
+    retryBtn.addEventListener('click', restartGame);
+    startBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); startGame(); });
+    retryBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); restartGame(); });
 
     animate();
 }
@@ -431,7 +477,8 @@ function createStars() {
     const colors = [];
     const sizes = [];
 
-    for (let i = 0; i < 2000; i++) {
+    const starCount = IS_MOBILE ? 800 : 2000;
+    for (let i = 0; i < starCount; i++) {
         positions.push(
             (Math.random() - 0.5) * 200,
             Math.random() * 60 + 5,
@@ -832,7 +879,8 @@ function spawnTrailParticle() {
 }
 
 function spawnExplosion(x, y, z, count, colorBase) {
-    for (let i = 0; i < count; i++) {
+    const actualCount = IS_MOBILE ? Math.floor(count * 0.4) : count;
+    for (let i = 0; i < actualCount; i++) {
         const size = 0.05 + Math.random() * 0.2;
         let geo;
         const r = Math.random();
@@ -1179,7 +1227,7 @@ function update(dt) {
     playerGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
     // Trail particles
-    if (Math.random() < 0.6) {
+    if (Math.random() < (IS_MOBILE ? 0.3 : 0.6)) {
         spawnTrailParticle();
     }
 
