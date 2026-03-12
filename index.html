@@ -274,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.0</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.1</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -635,7 +635,7 @@ function canClearGroup(groupObstacles, spd) {
             const dist = obs.x - jumpX;
             const playerH = arc.heightAtDist(dist);
             let requiredH;
-            requiredH = 0.6; // spike effective height from ground
+            requiredH = (obs.spikeHeight || 1.0) * 0.6; // spike effective height from ground
             if (playerH < requiredH) {
                 clears = false;
                 break;
@@ -674,120 +674,141 @@ function generateLevel() {
 
         let groupObstacles = [];
 
-        // Only spikes and platforms with spikes underneath
+        // Spike height varies with difficulty
+        const spikeH = () => {
+            const base = 1.0;
+            const extra = difficulty * 1.0 * Math.random();
+            return base + extra; // 1.0 to 2.0
+        };
+
+        // Only spikes (some tall) and connected platforms with spikes underneath
         if (difficulty < 0.2) {
             // Tutorial zone - single spikes
-            groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            groupObstacles = [{ type: 'spike', x: pos, y: 0, spikeHeight: 1.0 }];
         } else if (difficulty < 0.5) {
             // Easy zone
-            if (r < 0.4) {
-                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            } else if (r < 0.65) {
-                // Double spike
+            if (r < 0.3) {
+                groupObstacles = [{ type: 'spike', x: pos, y: 0, spikeHeight: spikeH() }];
+            } else if (r < 0.5) {
+                // Double spike, one taller
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 1.2, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 1.2, y: 0, spikeHeight: spikeH() },
                 ];
             } else {
-                // Platform with spikes underneath
-                const pw = 2.0 + Math.random() * 1.0;
-                const py = 1.2 + Math.random() * 0.3;
-                groupObstacles = [
-                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py },
-                    { type: 'spike', x: pos - pw/3, y: 0 },
-                    { type: 'spike', x: pos + pw/3, y: 0 },
-                ];
+                // Connected platform bridge with spikes underneath
+                const steps = 2 + Math.floor(Math.random() * 2);
+                const pw = 2.0 + Math.random() * 0.5;
+                let py = 1.0 + Math.random() * 0.3;
+                groupObstacles = [];
+                for (let s = 0; s < steps; s++) {
+                    const px = pos + s * (pw - 0.1); // overlap slightly for connection
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
+                    groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
+                    py += 0.3 + Math.random() * 0.3; // gradually go up
+                }
             }
         } else if (difficulty < 0.7) {
             // Medium zone
-            if (r < 0.25) {
-                groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
-            } else if (r < 0.45) {
-                // Double spike
+            if (r < 0.2) {
+                const h = spikeH();
+                groupObstacles = [{ type: 'spike', x: pos, y: 0, spikeHeight: h }];
+            } else if (r < 0.35) {
+                // Double spike, mixed heights
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 1.0, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.0 },
+                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: 1.5 + Math.random() * 0.5 },
                 ];
-            } else if (r < 0.65) {
-                // Triple spike
+            } else if (r < 0.5) {
+                // Triple spike with height variation
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 1.0, y: 0 },
-                    { type: 'spike', x: pos + 2.0, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: 1.6 + Math.random() * 0.4 },
+                    { type: 'spike', x: pos + 2.0, y: 0, spikeHeight: spikeH() },
                 ];
-            } else if (r < 0.85) {
-                // Platform with spikes underneath
-                const pw = 2.5 + Math.random() * 1.0;
-                const py = 1.2 + Math.random() * 0.5;
-                const spikeCount = 2 + Math.floor(Math.random() * 2);
-                groupObstacles = [
-                    { type: 'platform', x: pos, y: 0, width: pw, platformY: py },
-                ];
-                for (let s = 0; s < spikeCount; s++) {
-                    groupObstacles.push({ type: 'spike', x: pos - pw/2 + 0.5 + s * (pw / spikeCount), y: 0 });
+            } else if (r < 0.75) {
+                // Connected ascending platforms with spikes
+                const steps = 3 + Math.floor(Math.random() * 2);
+                const pw = 1.8 + Math.random() * 0.6;
+                let py = 0.9 + Math.random() * 0.2;
+                groupObstacles = [];
+                for (let s = 0; s < steps; s++) {
+                    const px = pos + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
+                    if (s < steps - 1) {
+                        groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
+                    }
+                    py += 0.4 + Math.random() * 0.3;
                 }
             } else {
-                // Spike then platform with spikes
-                const pw = 2.0 + Math.random() * 0.8;
-                const py = 1.2 + Math.random() * 0.4;
+                // Spike then connected platforms going up
+                const pw = 2.0 + Math.random() * 0.5;
+                let py = 1.1 + Math.random() * 0.3;
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'platform', x: pos + 2.5, y: 0, width: pw, platformY: py },
-                    { type: 'spike', x: pos + 2.5, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.3 + Math.random() * 0.5 },
                 ];
+                for (let s = 0; s < 2; s++) {
+                    const px = pos + 2.0 + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
+                    groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
+                    py += 0.5 + Math.random() * 0.3;
+                }
             }
         } else {
             // Hard zone
-            if (r < 0.2) {
-                // Double spike
+            if (r < 0.15) {
+                // Double tall spikes
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 1.0, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.4 + Math.random() * 0.6 },
+                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: 1.4 + Math.random() * 0.6 },
                 ];
-            } else if (r < 0.4) {
-                // Triple spike
+            } else if (r < 0.3) {
+                // Triple mixed height spikes
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 0.9, y: 0 },
-                    { type: 'spike', x: pos + 1.8, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.0 },
+                    { type: 'spike', x: pos + 0.9, y: 0, spikeHeight: 1.8 + Math.random() * 0.2 },
+                    { type: 'spike', x: pos + 1.8, y: 0, spikeHeight: 1.2 },
                 ];
-            } else if (r < 0.55) {
-                // Quad spike
+            } else if (r < 0.45) {
+                // Quad spikes with height variation
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 0.85, y: 0 },
-                    { type: 'spike', x: pos + 1.7, y: 0 },
-                    { type: 'spike', x: pos + 2.55, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 0.85, y: 0, spikeHeight: 1.6 + Math.random() * 0.4 },
+                    { type: 'spike', x: pos + 1.7, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 2.55, y: 0, spikeHeight: 1.5 + Math.random() * 0.5 },
                 ];
-            } else if (r < 0.75) {
-                // Platform staircase with spikes under each
-                const steps = 2 + Math.floor(Math.random() * 2);
-                const pw = 1.6 + Math.random() * 0.6;
-                let py = 0.9 + Math.random() * 0.3;
+            } else if (r < 0.7) {
+                // Long connected platform staircase going high into the air
+                const steps = 3 + Math.floor(Math.random() * 3);
+                const pw = 1.6 + Math.random() * 0.5;
+                let py = 0.8 + Math.random() * 0.3;
                 groupObstacles = [];
                 for (let s = 0; s < steps; s++) {
-                    const px = pos + s * (pw + 0.4);
+                    const px = pos + s * (pw - 0.1);
                     groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
-                    groupObstacles.push({ type: 'spike', x: px, y: 0 });
-                    py += 0.5 + Math.random() * 0.4;
+                    groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
+                    py += 0.4 + Math.random() * 0.4; // goes higher and higher
                 }
             } else {
-                // Spike gauntlet: spike, platform+spikes, spike
-                const pw = 2.0 + Math.random() * 1.0;
-                const py = 1.2 + Math.random() * 0.5;
+                // Spike gauntlet into connected ascending platforms
+                const pw = 1.8 + Math.random() * 0.6;
+                let py = 1.2 + Math.random() * 0.3;
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0 },
-                    { type: 'spike', x: pos + 1.0, y: 0 },
-                    { type: 'platform', x: pos + 3.0, y: 0, width: pw, platformY: py },
-                    { type: 'spike', x: pos + 2.5, y: 0 },
-                    { type: 'spike', x: pos + 3.5, y: 0 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.5 + Math.random() * 0.5 },
+                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: spikeH() },
                 ];
+                for (let s = 0; s < 3; s++) {
+                    const px = pos + 2.5 + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
+                    groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
+                    py += 0.5 + Math.random() * 0.3;
+                }
             }
         }
 
         // Verify the group is clearable
         if (!canClearGroup(groupObstacles, currentSpeed)) {
-            groupObstacles = [{ type: 'spike', x: pos, y: 0 }];
+            groupObstacles = [{ type: 'spike', x: pos, y: 0, spikeHeight: 1.0 }];
         }
 
         // Add obstacles to level
@@ -935,7 +956,9 @@ function createObstacle(data) {
     const color = neonColors[Math.floor(Math.random() * neonColors.length)];
 
     if (data.type === 'spike') {
-        const geo = new THREE.ConeGeometry(0.4, 1.0, 4);
+        const spikeH = data.spikeHeight || 1.0;
+        const spikeR = 0.4 * (0.7 + spikeH * 0.3);
+        const geo = new THREE.ConeGeometry(spikeR, spikeH, 4);
         const mat = new THREE.MeshStandardMaterial({
             color: color,
             emissive: color,
@@ -944,11 +967,11 @@ function createObstacle(data) {
             roughness: 0.3,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(data.x, 0.5, 0);
+        mesh.position.set(data.x, spikeH / 2, 0);
         mesh.castShadow = true;
 
         // Glow ring at base
-        const ringGeo = new THREE.RingGeometry(0.3, 0.5, 16);
+        const ringGeo = new THREE.RingGeometry(spikeR - 0.1, spikeR + 0.1, 16);
         const ringMat = new THREE.MeshBasicMaterial({
             color: color,
             transparent: true,
@@ -961,7 +984,7 @@ function createObstacle(data) {
         scene.add(ring);
         decorations.push(ring);
 
-        mesh.userData = { type: 'spike', radius: 0.35, height: 1.0 };
+        mesh.userData = { type: 'spike', radius: spikeR * 0.85, height: spikeH };
 
     } else if (data.type === 'block') {
         const h = data.height || 1;
@@ -1293,23 +1316,14 @@ function checkCollision() {
         if (Math.abs(px - ox) > 3) continue;
 
         if (ud.type === 'spike') {
+            const sH = ud.height || 1.0;
+            const sR = ud.radius || 0.35;
             const dx = px - ox;
             const dy = py - oy;
-            if (Math.abs(dx) < halfSize + 0.18 && dy < 0.35 && dy > -0.5) {
-                return true;
-            }
-        } else if (ud.type === 'block' || ud.type === 'pillar') {
-            const w = (ud.width || 0.8) / 2;
-            const h = ud.height || 1;
-            if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05 &&
-                py - halfSize < h - 0.05 && py + halfSize > 0.1) {
-                return true;
-            }
-        } else if (ud.type === 'saw') {
-            const dx = px - ox;
-            const dy = py - oy;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < (ud.radius || 0.85) + halfSize - 0.1) {
+            // Cone collision: wider at base, narrow at top
+            const heightFraction = Math.max(0, (sH/2 - dy) / sH);
+            const effectiveRadius = sR * heightFraction;
+            if (Math.abs(dx) < halfSize + effectiveRadius && dy < sH * 0.4 && dy > -sH * 0.5) {
                 return true;
             }
         }
@@ -1595,10 +1609,9 @@ function update(dt) {
 
     playerGroup.position.y = playerY;
 
-    // Rotation - cube rotates only when in the air (jumping)
+    // Rotation - cube rotates forward only when in the air (small rotation)
     if (!isGrounded) {
-        const distThisFrame = speed * dt;
-        const rotAngle = (distThisFrame / PLAYER_SIZE) * (Math.PI / 2);
+        const rotAngle = 0.04 * dt; // slow gentle forward spin
         rotation -= rotAngle;
     } else {
         // Snap to nearest 90° when grounded
