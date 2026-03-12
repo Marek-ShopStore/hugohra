@@ -274,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.3</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.4</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -840,76 +840,22 @@ function generateLevel() {
         createObstacle(item);
     }
 
-    // Place 5 coins at hard-to-reach locations
-    // Find platform obstacles and spike clusters to place coins near them
-    const coinPositions = [];
-    const spikeGroups = [];
-    const platforms = [];
-
-    for (const item of levelData) {
-        if (item.type === 'platform') platforms.push(item);
-        if (item.type === 'spike') spikeGroups.push(item);
-    }
-
-    // Strategy: place coins above spike clusters (need precise jump) and
-    // above platforms at extra height (need to jump from platform)
-    // Spread coins across the level
+    // Place 5 coins on the normal path, reachable with a jump
     const sectionLength = totalLevelLength / (TOTAL_COINS + 1);
+    const coinY = 1.5 + PLAYER_SIZE / 2; // comfortable jump height
 
     for (let i = 0; i < TOTAL_COINS; i++) {
-        const sectionStart = sectionLength * (i + 1) - sectionLength * 0.4;
-        const sectionEnd = sectionLength * (i + 1) + sectionLength * 0.4;
-
-        // Find obstacles in this section
-        const sectionSpikes = spikeGroups.filter(s => s.x >= sectionStart && s.x <= sectionEnd);
-        const sectionPlatforms = platforms.filter(p => p.x >= sectionStart && p.x <= sectionEnd);
-
-        let coinX, coinY;
-
-        if (sectionPlatforms.length > 0 && Math.random() < 0.5) {
-            // Place coin high above platform - need to jump from platform top
-            const plat = sectionPlatforms[Math.floor(Math.random() * sectionPlatforms.length)];
-            coinX = plat.x;
-            coinY = (plat.platformY || 1.2) + 1.8 + Math.random() * 0.5;
-        } else if (sectionSpikes.length >= 2) {
-            // Place coin between/above spike cluster - very risky to grab
-            const spike = sectionSpikes[Math.floor(Math.random() * sectionSpikes.length)];
-            coinX = spike.x + (Math.random() - 0.5) * 0.5;
-            coinY = 1.8 + Math.random() * 0.8;
-        } else if (sectionSpikes.length > 0) {
-            // Place coin directly above a spike - need perfect timing
-            const spike = sectionSpikes[Math.floor(Math.random() * sectionSpikes.length)];
-            coinX = spike.x;
-            coinY = 2.0 + Math.random() * 0.5;
-        } else {
-            // Fallback: place high up requiring a well-timed jump
-            coinX = (sectionStart + sectionEnd) / 2;
-            coinY = 2.5 + Math.random() * 0.5;
-        }
-
-        coinPositions.push({ x: coinX, y: coinY });
-    }
-
-    // Add spike guards near coins to make paths harder
-    for (const cp of coinPositions) {
-        // Add extra spikes around the coin approach path
-        if (Math.random() < 0.6) {
-            levelData.push({ type: 'spike', x: cp.x - 1.2, y: 0 });
-            createObstacle({ type: 'spike', x: cp.x - 1.2, y: 0 });
-        }
-        if (Math.random() < 0.6) {
-            levelData.push({ type: 'spike', x: cp.x + 1.2, y: 0 });
-            createObstacle({ type: 'spike', x: cp.x + 1.2, y: 0 });
-        }
-        createCoin(cp.x, cp.y);
+        const coinX = sectionLength * (i + 1);
+        createCoin(coinX, coinY);
     }
 }
 
 function createCoin(x, y) {
     const coinGroup = new THREE.Group();
 
-    // Main coin disc - BIG and YELLOW
-    const geo = new THREE.CylinderGeometry(0.55, 0.55, 0.12, 20);
+    // Main coin disc - same size as player cube
+    const coinRadius = PLAYER_SIZE / 2;
+    const geo = new THREE.CylinderGeometry(coinRadius, coinRadius, 0.1, 20);
     const mat = new THREE.MeshStandardMaterial({
         color: 0xffdd00,
         emissive: 0xffcc00,
@@ -922,7 +868,7 @@ function createCoin(x, y) {
     coinGroup.add(coinMesh);
 
     // Inner star detail
-    const innerGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.14, 5);
+    const innerGeo = new THREE.CylinderGeometry(coinRadius * 0.45, coinRadius * 0.45, 0.12, 5);
     const innerMat = new THREE.MeshBasicMaterial({
         color: 0xffff44,
         transparent: true,
@@ -932,8 +878,8 @@ function createCoin(x, y) {
     inner.rotation.x = Math.PI / 2;
     coinGroup.add(inner);
 
-    // Big bright glow
-    const glowGeo = new THREE.SphereGeometry(0.8, 12, 8);
+    // Glow
+    const glowGeo = new THREE.SphereGeometry(coinRadius * 1.5, 12, 8);
     const glowMat = new THREE.MeshBasicMaterial({
         color: 0xffdd00,
         transparent: true,
@@ -942,19 +888,6 @@ function createCoin(x, y) {
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
     coinGroup.add(glow);
-
-    // Extra outer glow ring
-    const ringGeo = new THREE.RingGeometry(0.6, 0.75, 20);
-    const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xffee00,
-        transparent: true,
-        opacity: 0.3,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2;
-    coinGroup.add(ring);
 
     coinGroup.position.set(x, y, 0);
     coinGroup.userData = { type: 'coin', collected: false };
