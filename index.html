@@ -274,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.5</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.6</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -1270,7 +1270,7 @@ function checkCollision() {
 function checkPlatformLanding() {
     const px = playerGroup.position.x;
     const py = playerY;
-    const halfSize = PLAYER_SIZE * 0.32;
+    const halfSize = PLAYER_SIZE / 2;
 
     for (const obs of obstacles) {
         const ud = obs.userData;
@@ -1280,13 +1280,12 @@ function checkPlatformLanding() {
         const w = (ud.width || 2.0) / 2;
         const h = ud.height || 0.35;
         const platTop = ud.platformY + h / 2;
-        const platBottom = ud.platformY - h / 2;
 
         // Check horizontal overlap
         if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05) {
             // Player is falling and feet are near platform top
-            if (jumpVelocity <= 0 && py - halfSize <= platTop + 0.15 && py - halfSize >= platBottom - 0.1) {
-                return platTop + halfSize + 0.02;
+            if (jumpVelocity <= 0 && py - halfSize <= platTop + 0.15 && py - halfSize >= platTop - 0.3) {
+                return platTop + halfSize;
             }
         }
     }
@@ -1515,6 +1514,28 @@ function update(dt) {
     if (!isGrounded) {
         jumpVelocity += gravity * dt;
         playerY += jumpVelocity * dt;
+
+        // Block jumping through platform from below
+        if (jumpVelocity > 0) {
+            const halfSize = PLAYER_SIZE / 2;
+            const px = playerGroup.position.x;
+            for (const obs of obstacles) {
+                const ud = obs.userData;
+                if (ud.type !== 'platform') continue;
+                const ox = obs.position.x;
+                const w = (ud.width || 2.0) / 2;
+                const h = ud.height || 0.35;
+                const platBottom = ud.platformY - h / 2;
+                // Check horizontal overlap
+                if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05) {
+                    // Player head hitting platform bottom
+                    if (playerY + halfSize >= platBottom && playerY + halfSize <= platBottom + 0.3) {
+                        playerY = platBottom - halfSize;
+                        jumpVelocity = 0;
+                    }
+                }
+            }
+        }
 
         // Check platform landing
         const platformTop = checkPlatformLanding();
