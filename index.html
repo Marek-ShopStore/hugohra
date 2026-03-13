@@ -274,7 +274,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.6</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.7</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -311,6 +311,17 @@ let playerY = 0.6;
 let rotation = 0;
 let groundY = 0;
 let jumpPressed = false;
+
+// Rocket mode
+let isRocketMode = false;
+let rocketMesh = null;
+let portals = [];
+const ROCKET_GRAVITY = -0.008;
+const ROCKET_THRUST = 0.014;
+const ROCKET_MAX_VY = 0.18;
+const ROCKET_MIN_VY = -0.18;
+const ROCKET_CEILING = 6.5;
+const ROCKET_FLOOR = 0.8;
 let cameraShake = 0;
 let beatPulse = 0;
 let colorPhase = 0;
@@ -389,9 +400,9 @@ function init() {
     // Show appropriate controls info
     const controlsInfo = document.getElementById('controls-info');
     if (isTouchDevice) {
-        controlsInfo.textContent = 'DOTKNI SE OBRAZOVKY = Skok | Drž pro multi-skok';
+        controlsInfo.textContent = 'DOTKNI SE = Skok | Portál = Raketka (drž = leť nahoru)';
     } else {
-        controlsInfo.textContent = 'MEZERNÍK / KLIK = Skok | NAHORU = Skok | Drž pro multi-skok';
+        controlsInfo.textContent = 'MEZERNÍK / KLIK = Skok | Portál = Raketka (drž = leť)';
     }
 
     // Events
@@ -490,6 +501,52 @@ function createPlayer() {
     hitboxMesh = new THREE.Mesh(hbGeo, hbMat);
     hitboxMesh.visible = false;
     playerGroup.add(hitboxMesh);
+
+    // Rocket mesh (hidden by default)
+    const rocketGroup = new THREE.Group();
+    // Body
+    const rBodyGeo = new THREE.BoxGeometry(0.7, 0.35, 0.35);
+    const rBodyMat = new THREE.MeshStandardMaterial({
+        color: 0xff8800, emissive: 0xff4400, emissiveIntensity: 0.8,
+        metalness: 0.8, roughness: 0.2
+    });
+    const rBody = new THREE.Mesh(rBodyGeo, rBodyMat);
+    rocketGroup.add(rBody);
+    // Nose cone
+    const rNoseGeo = new THREE.ConeGeometry(0.2, 0.35, 4);
+    const rNoseMat = new THREE.MeshStandardMaterial({
+        color: 0xffcc00, emissive: 0xff8800, emissiveIntensity: 0.6,
+        metalness: 0.7, roughness: 0.3
+    });
+    const rNose = new THREE.Mesh(rNoseGeo, rNoseMat);
+    rNose.rotation.z = -Math.PI / 2;
+    rNose.position.x = 0.5;
+    rocketGroup.add(rNose);
+    // Top fin
+    const finGeo = new THREE.BoxGeometry(0.3, 0.2, 0.05);
+    const finMat = new THREE.MeshStandardMaterial({
+        color: 0xff0044, emissive: 0xff0022, emissiveIntensity: 0.6
+    });
+    const topFin = new THREE.Mesh(finGeo, finMat);
+    topFin.position.set(-0.25, 0.25, 0);
+    rocketGroup.add(topFin);
+    // Bottom fin
+    const bottomFin = new THREE.Mesh(finGeo, finMat.clone());
+    bottomFin.position.set(-0.25, -0.25, 0);
+    rocketGroup.add(bottomFin);
+    // Engine glow
+    const engineGeo = new THREE.SphereGeometry(0.12, 8, 6);
+    const engineMat = new THREE.MeshBasicMaterial({
+        color: 0xff4400, transparent: true, opacity: 0.8,
+        blending: THREE.AdditiveBlending
+    });
+    const engine = new THREE.Mesh(engineGeo, engineMat);
+    engine.position.x = -0.4;
+    rocketGroup.add(engine);
+
+    rocketGroup.visible = false;
+    rocketMesh = rocketGroup;
+    playerGroup.add(rocketGroup);
 
     playerGroup.position.set(0, GROUND_LEVEL, 0);
     scene.add(playerGroup);
@@ -806,6 +863,45 @@ function generateLevel() {
             }
         }
 
+        // Check if it's time for a rocket section (every ~200 units, starting at 100)
+        const rocketSectionInterval = 200;
+        const nextRocketAt = 100 + Math.floor((pos - 100) / rocketSectionInterval) * rocketSectionInterval;
+        if (pos >= nextRocketAt && pos < nextRocketAt + 5 && difficulty > 0.1) {
+            // Insert a rocket/flappy section
+            const sectionLength = 40 + Math.floor(difficulty * 30);
+            const portalX = pos + 3;
+            levelData.push({ type: 'portal', x: portalX, toRocket: true, portalY: 2.5 });
+
+            // Generate flappy bird pipes
+            let pipeX = portalX + 8;
+            const pipeEnd = portalX + sectionLength;
+            while (pipeX < pipeEnd) {
+                const gapSize = 2.8 - difficulty * 0.8; // Gap shrinks with difficulty (2.8 -> 2.0)
+                const gapCenter = 2.0 + Math.random() * 3.0; // Gap center between 2.0 and 5.0
+                const gapTop = gapCenter + gapSize / 2;
+
+                // Bottom pipe
+                const bottomH = gapCenter - gapSize / 2;
+                if (bottomH > 0.3) {
+                    levelData.push({ type: 'pipe', x: pipeX, isTop: false, gapTop: gapCenter, gapSize: gapSize, pipeHeight: bottomH });
+                }
+
+                // Top pipe
+                const topH = ROCKET_CEILING + 1 - gapTop;
+                if (topH > 0.3) {
+                    levelData.push({ type: 'pipe', x: pipeX, isTop: true, gapTop: gapCenter, gapSize: gapSize, pipeHeight: topH });
+                }
+
+                pipeX += 5.0 + Math.random() * 3.0 - difficulty * 1.5; // Pipes get closer with difficulty
+            }
+
+            // End portal to switch back
+            levelData.push({ type: 'portal', x: pipeEnd + 3, toRocket: false, portalY: 2.5 });
+
+            pos = pipeEnd + 10;
+            continue;
+        }
+
         // Verify the group is clearable
         if (!canClearGroup(groupObstacles, currentSpeed)) {
             groupObstacles = [{ type: 'spike', x: pos, y: 0, spikeHeight: 1.0 }];
@@ -1028,6 +1124,77 @@ function createObstacle(data) {
         decorations.push(wire);
 
         mesh.userData = { type: 'platform', width: w, height: h, platformY: platformY };
+    } else if (data.type === 'portal') {
+        // Portal - glowing ring that switches mode
+        const portalGroup = new THREE.Group();
+        const portalColor = data.toRocket ? 0xff8800 : 0x00ffff;
+
+        // Outer ring
+        const ringGeo = new THREE.TorusGeometry(1.2, 0.12, 16, 32);
+        const ringMat = new THREE.MeshStandardMaterial({
+            color: portalColor, emissive: portalColor, emissiveIntensity: 1.2,
+            metalness: 0.9, roughness: 0.1
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.y = Math.PI / 2;
+        portalGroup.add(ring);
+
+        // Inner glow
+        const innerGeo = new THREE.CircleGeometry(1.0, 32);
+        const innerMat = new THREE.MeshBasicMaterial({
+            color: portalColor, transparent: true, opacity: 0.3,
+            side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+        });
+        const inner = new THREE.Mesh(innerGeo, innerMat);
+        inner.rotation.y = Math.PI / 2;
+        portalGroup.add(inner);
+
+        // Point light
+        const pLight = new THREE.PointLight(portalColor, 3, 8);
+        portalGroup.add(pLight);
+
+        const portalY = data.portalY || 2.0;
+        portalGroup.position.set(data.x, portalY, 0);
+        portalGroup.userData = { type: 'portal', toRocket: data.toRocket, portalY: portalY };
+
+        scene.add(portalGroup);
+        portals.push(portalGroup);
+        return; // Don't add to obstacles array
+
+    } else if (data.type === 'pipe') {
+        // Flappy bird style pipe (top or bottom)
+        const pw = 1.0;
+        const ph = data.pipeHeight || 3;
+        const geo = new THREE.BoxGeometry(pw, ph, 1.2);
+        const pipeMat = new THREE.MeshStandardMaterial({
+            color: 0x00cc44, emissive: 0x008822, emissiveIntensity: 0.5,
+            metalness: 0.6, roughness: 0.3
+        });
+        mesh = new THREE.Mesh(geo, pipeMat);
+        const pipeY = data.isTop ? (ROCKET_CEILING + 0.5 - ph / 2 + (ROCKET_CEILING - data.gapTop)) : (ph / 2 - 0.1);
+        mesh.position.set(data.x, data.isTop ? data.gapTop + data.gapSize / 2 + ph / 2 : data.gapTop - data.gapSize / 2 - ph / 2, 0);
+
+        // Cap on the pipe end
+        const capGeo = new THREE.BoxGeometry(pw + 0.3, 0.3, 1.4);
+        const capMat = new THREE.MeshStandardMaterial({
+            color: 0x00ee55, emissive: 0x00aa33, emissiveIntensity: 0.6,
+            metalness: 0.5, roughness: 0.3
+        });
+        const cap = new THREE.Mesh(capGeo, capMat);
+        cap.position.y = data.isTop ? -ph / 2 : ph / 2;
+        mesh.add(cap);
+
+        // Glow edge
+        const glowGeo = new THREE.BoxGeometry(pw + 0.4, 0.08, 1.5);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0x44ff88, transparent: true, opacity: 0.4,
+            blending: THREE.AdditiveBlending
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.position.y = data.isTop ? -ph / 2 - 0.15 : ph / 2 + 0.15;
+        mesh.add(glow);
+
+        mesh.userData = { type: 'pipe', width: pw, pipeHeight: ph, isTop: data.isTop, gapTop: data.gapTop, gapSize: data.gapSize };
     }
 
     if (mesh) {
@@ -1047,6 +1214,8 @@ function createObstacle(data) {
             const w = ud.width || 2.0;
             const h = ud.height || 0.35;
             hbGeo = new THREE.BoxGeometry(w, h, 1.0);
+        } else if (ud.type === 'pipe') {
+            hbGeo = new THREE.BoxGeometry(ud.width || 1.0, ud.pipeHeight || 3, 1.2);
         }
         if (hbGeo) {
             const hbColor = (ud.type === 'platform') ? 0x00ff44 : 0xff0000;
@@ -1262,6 +1431,18 @@ function checkCollision() {
             }
         }
         // Platforms are NOT deadly - handled in physics
+
+        if (ud.type === 'pipe') {
+            const pw = (ud.width || 1.0) / 2;
+            const ph = ud.pipeHeight || 3;
+            const pipeTop = oy + ph / 2;
+            const pipeBottom = oy - ph / 2;
+            if (px + halfSize > ox - pw && px - halfSize < ox + pw) {
+                if (py + halfSize > pipeBottom && py - halfSize < pipeTop) {
+                    return true;
+                }
+            }
+        }
     }
     return false;
 }
@@ -1290,6 +1471,62 @@ function checkPlatformLanding() {
         }
     }
     return null;
+}
+
+function checkPortalCollision() {
+    const px = playerGroup.position.x;
+    const py = playerY;
+    for (const portal of portals) {
+        if (portal.userData.passed) continue;
+        const ox = portal.position.x;
+        const oy = portal.userData.portalY;
+        if (Math.abs(px - ox) < 1.0 && Math.abs(py - oy) < 2.0) {
+            portal.userData.passed = true;
+            const toRocket = portal.userData.toRocket;
+            if (toRocket && !isRocketMode) {
+                enterRocketMode();
+            } else if (!toRocket && isRocketMode) {
+                exitRocketMode();
+            }
+            // Flash effect
+            spawnExplosion(ox, oy, 0, 30, toRocket ? 0.08 : 0.5);
+        }
+    }
+}
+
+function enterRocketMode() {
+    isRocketMode = true;
+    isGrounded = false;
+    jumpVelocity = 0;
+    // Position player up a bit if on ground
+    if (playerY < ROCKET_FLOOR + 0.5) {
+        playerY = ROCKET_FLOOR + 0.5;
+    }
+    // Show rocket, hide cube
+    player.visible = false;
+    playerGroup.children[1].visible = false; // inner glow
+    playerGroup.children[2].visible = false; // wireframe
+    rocketMesh.visible = true;
+    rotation = 0;
+    player.rotation.z = 0;
+}
+
+function exitRocketMode() {
+    isRocketMode = false;
+    jumpVelocity = 0;
+    // Show cube, hide rocket
+    player.visible = true;
+    playerGroup.children[1].visible = true;
+    playerGroup.children[2].visible = true;
+    rocketMesh.visible = false;
+    // Land on ground if low enough
+    if (playerY <= GROUND_LEVEL + 0.5) {
+        playerY = GROUND_LEVEL;
+        isGrounded = true;
+    } else {
+        isGrounded = false;
+    }
+    rotation = 0;
 }
 
 function checkCoinCollection() {
@@ -1355,6 +1592,12 @@ function startGame() {
     colorPhase = 0;
     lastTime = 0;
 
+    isRocketMode = false;
+    if (rocketMesh) rocketMesh.visible = false;
+    player.visible = true;
+    playerGroup.children[1].visible = true;
+    playerGroup.children[2].visible = true;
+
     playerGroup.position.set(0, GROUND_LEVEL, 0);
     player.rotation.set(0, 0, 0);
 
@@ -1384,6 +1627,9 @@ function restartGame() {
     for (const c of coins) {
         scene.remove(c);
     }
+    for (const p of portals) {
+        scene.remove(p);
+    }
 
     obstacles = [];
     decorations = [];
@@ -1392,7 +1638,15 @@ function restartGame() {
     shockwaves = [];
     groundTiles = [];
     coins = [];
+    portals = [];
     collectedCoins = 0;
+
+    // Reset rocket mode
+    isRocketMode = false;
+    if (rocketMesh) rocketMesh.visible = false;
+    player.visible = true;
+    playerGroup.children[1].visible = true;
+    playerGroup.children[2].visible = true;
     document.getElementById('coin-display').textContent = `0 / ${TOTAL_COINS}`;
 
     // Recreate
@@ -1503,77 +1757,134 @@ function update(dt) {
     player.material.emissive.copy(playerColor);
     playerGroup.children[3].color.copy(playerColor); // point light
 
-    // Jump
-    if (jumpPressed && isGrounded) {
-        jumpVelocity = jumpForce;
-        isGrounded = false;
-        spawnJumpBurst();
-    }
+    // Check portal collisions
+    checkPortalCollision();
 
-    // Gravity
-    if (!isGrounded) {
-        jumpVelocity += gravity * dt;
+    if (isRocketMode) {
+        // --- ROCKET / FLAPPY BIRD MODE ---
+        if (jumpPressed) {
+            jumpVelocity += ROCKET_THRUST * dt;
+        } else {
+            jumpVelocity += ROCKET_GRAVITY * dt;
+        }
+        // Clamp velocity
+        jumpVelocity = Math.max(ROCKET_MIN_VY, Math.min(ROCKET_MAX_VY, jumpVelocity));
         playerY += jumpVelocity * dt;
 
-        // Block jumping through platform from below
-        if (jumpVelocity > 0) {
-            const halfSize = PLAYER_SIZE / 2;
-            const px = playerGroup.position.x;
-            for (const obs of obstacles) {
-                const ud = obs.userData;
-                if (ud.type !== 'platform') continue;
-                const ox = obs.position.x;
-                const w = (ud.width || 2.0) / 2;
-                const h = ud.height || 0.35;
-                const platBottom = ud.platformY - h / 2;
-                // Check horizontal overlap
-                if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05) {
-                    // Player head hitting platform bottom
-                    if (playerY + halfSize >= platBottom && playerY + halfSize <= platBottom + 0.3) {
-                        playerY = platBottom - halfSize;
-                        jumpVelocity = 0;
+        // Ceiling and floor
+        if (playerY >= ROCKET_CEILING) {
+            playerY = ROCKET_CEILING;
+            jumpVelocity = 0;
+        }
+        if (playerY <= ROCKET_FLOOR) {
+            playerY = ROCKET_FLOOR;
+            jumpVelocity = Math.max(jumpVelocity, 0);
+        }
+
+        playerGroup.position.y = playerY;
+
+        // Rocket tilts based on velocity
+        const targetTilt = jumpVelocity * 3.0; // tilt up when going up, down when falling
+        rotation += (targetTilt - rotation) * 0.15;
+        rocketMesh.rotation.z = rotation;
+
+        // Engine particles when thrusting
+        if (jumpPressed && Math.random() < 0.7) {
+            const geo = new THREE.SphereGeometry(0.06, 4, 4);
+            const mat = new THREE.MeshBasicMaterial({
+                color: Math.random() > 0.5 ? 0xff4400 : 0xffaa00,
+                transparent: true, opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(
+                playerGroup.position.x - 0.5,
+                playerGroup.position.y + (Math.random() - 0.5) * 0.2,
+                (Math.random() - 0.5) * 0.3
+            );
+            p.userData = {
+                vx: -0.08 - Math.random() * 0.05,
+                vy: (Math.random() - 0.5) * 0.03,
+                vz: (Math.random() - 0.5) * 0.03,
+                life: 1.0, decay: 0.04 + Math.random() * 0.02
+            };
+            scene.add(p);
+            particles.push(p);
+        }
+    } else {
+        // --- NORMAL CUBE MODE ---
+        // Jump
+        if (jumpPressed && isGrounded) {
+            jumpVelocity = jumpForce;
+            isGrounded = false;
+            spawnJumpBurst();
+        }
+
+        // Gravity
+        if (!isGrounded) {
+            jumpVelocity += gravity * dt;
+            playerY += jumpVelocity * dt;
+
+            // Block jumping through platform from below
+            if (jumpVelocity > 0) {
+                const halfSize = PLAYER_SIZE / 2;
+                const px = playerGroup.position.x;
+                for (const obs of obstacles) {
+                    const ud = obs.userData;
+                    if (ud.type !== 'platform') continue;
+                    const ox = obs.position.x;
+                    const w = (ud.width || 2.0) / 2;
+                    const h = ud.height || 0.35;
+                    const platBottom = ud.platformY - h / 2;
+                    // Check horizontal overlap
+                    if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05) {
+                        // Player head hitting platform bottom
+                        if (playerY + halfSize >= platBottom && playerY + halfSize <= platBottom + 0.3) {
+                            playerY = platBottom - halfSize;
+                            jumpVelocity = 0;
+                        }
                     }
                 }
             }
+
+            // Check platform landing
+            const platformTop = checkPlatformLanding();
+            if (platformTop !== null && jumpVelocity <= 0) {
+                playerY = platformTop;
+                jumpVelocity = 0;
+                isGrounded = true;
+                spawnJumpBurst();
+            }
+
+            if (playerY <= GROUND_LEVEL) {
+                playerY = GROUND_LEVEL;
+                jumpVelocity = 0;
+                isGrounded = true;
+
+                // Land effect
+                spawnJumpBurst();
+            }
+        } else if (playerY > GROUND_LEVEL + 0.1) {
+            // If standing on platform, check if still on it
+            const platformTop = checkPlatformLanding();
+            if (platformTop === null) {
+                isGrounded = false;
+            }
         }
 
-        // Check platform landing
-        const platformTop = checkPlatformLanding();
-        if (platformTop !== null && jumpVelocity <= 0) {
-            playerY = platformTop;
-            jumpVelocity = 0;
-            isGrounded = true;
-            spawnJumpBurst();
-        }
+        playerGroup.position.y = playerY;
 
-        if (playerY <= GROUND_LEVEL) {
-            playerY = GROUND_LEVEL;
-            jumpVelocity = 0;
-            isGrounded = true;
-
-            // Land effect
-            spawnJumpBurst();
+        // Rotation - cube rotates forward only when in the air (small rotation)
+        if (!isGrounded) {
+            const rotAngle = 0.04 * dt; // gentle backward spin
+            rotation += rotAngle;
+        } else {
+            // Snap to nearest 90° when grounded
+            const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
+            rotation += (target - rotation) * 0.3;
         }
-    } else if (playerY > GROUND_LEVEL + 0.1) {
-        // If standing on platform, check if still on it
-        const platformTop = checkPlatformLanding();
-        if (platformTop === null) {
-            isGrounded = false;
-        }
+        player.rotation.z = rotation;
     }
-
-    playerGroup.position.y = playerY;
-
-    // Rotation - cube rotates forward only when in the air (small rotation)
-    if (!isGrounded) {
-        const rotAngle = 0.04 * dt; // gentle backward spin
-        rotation += rotAngle;
-    } else {
-        // Snap to nearest 90° when grounded
-        const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
-        rotation += (target - rotation) * 0.3;
-    }
-    player.rotation.z = rotation;
 
     // Move world (obstacles come from right to left)
     const moveAmount = speed * dt;
@@ -1585,6 +1896,11 @@ function update(dt) {
     }
     for (const g of groundTiles) {
         g.position.x -= moveAmount;
+    }
+    for (const portal of portals) {
+        portal.position.x -= moveAmount;
+        // Animate portal ring spinning
+        portal.children[0].rotation.x += 0.03 * dt;
     }
 
     // Beat pulse effect
@@ -1649,7 +1965,8 @@ function update(dt) {
 
     // Camera stays fixed on player (no drift)
     camera.position.x = playerGroup.position.x;
-    camera.position.y = 3 + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
+    const camTargetY = isRocketMode ? Math.max(3.5, playerY + 1.0) : 3;
+    camera.position.y = camTargetY + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
 
     // Camera shake
     if (cameraShake > 0) {
