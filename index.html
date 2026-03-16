@@ -274,10 +274,7 @@ let jumpPressed = false;
 let isRocketMode = false;
 let rocketMesh = null;
 let portals = [];
-const ROCKET_GRAVITY = -0.008;
-const ROCKET_THRUST = 0.014;
-const ROCKET_MAX_VY = 0.18;
-const ROCKET_MIN_VY = -0.18;
+const WAVE_SPEED = 0.13;
 const ROCKET_CEILING = 6.5;
 const ROCKET_FLOOR = 0.8;
 let cameraShake = 0;
@@ -1399,9 +1396,8 @@ function enterRocketMode() {
     isGrounded = false;
     jumpVelocity = 0;
     // Position player up a bit if on ground
-    if (playerY < ROCKET_FLOOR + 0.5) {
-        playerY = ROCKET_FLOOR + 0.5;
-    }
+    // Start wave at middle height
+    playerY = (ROCKET_CEILING + ROCKET_FLOOR) / 2;
     // Show rocket, hide cube
     player.visible = false;
     playerGroup.children[1].visible = false; // inner glow
@@ -1656,52 +1652,53 @@ function update(dt) {
     checkPortalCollision();
 
     if (isRocketMode) {
-        // --- ROCKET / FLAPPY BIRD MODE ---
+        // --- WAVE MODE (Geometry Dash style) ---
+        // Constant diagonal movement: hold = up, release = down
         if (jumpPressed) {
-            jumpVelocity += ROCKET_THRUST * dt;
+            jumpVelocity = WAVE_SPEED;
         } else {
-            jumpVelocity += ROCKET_GRAVITY * dt;
+            jumpVelocity = -WAVE_SPEED;
         }
-        // Clamp velocity
-        jumpVelocity = Math.max(ROCKET_MIN_VY, Math.min(ROCKET_MAX_VY, jumpVelocity));
         playerY += jumpVelocity * dt;
 
-        // Ceiling and floor
+        // Ceiling and floor - die on hit
         if (playerY >= ROCKET_CEILING) {
             playerY = ROCKET_CEILING;
             jumpVelocity = 0;
         }
         if (playerY <= ROCKET_FLOOR) {
             playerY = ROCKET_FLOOR;
-            jumpVelocity = Math.max(jumpVelocity, 0);
+            jumpVelocity = 0;
         }
 
         playerGroup.position.y = playerY;
 
-        // Rocket tilts based on velocity
-        const targetTilt = jumpVelocity * 3.0; // tilt up when going up, down when falling
-        rotation += (targetTilt - rotation) * 0.15;
+        // Wave tilts at 45° angle based on direction
+        const targetTilt = jumpPressed ? 0.6 : -0.6;
+        rotation += (targetTilt - rotation) * 0.3;
         rocketMesh.rotation.z = rotation;
 
-        // Engine particles when thrusting
-        if (jumpPressed && Math.random() < 0.7) {
-            const geo = new THREE.SphereGeometry(0.06, 4, 4);
+        // Trail particles behind the wave
+        if (Math.random() < 0.8) {
+            const geo = new THREE.SphereGeometry(0.05, 4, 4);
+            const hue = (colorPhase + Math.random() * 0.1) % 1;
+            const trailColor = new THREE.Color().setHSL(hue, 1, 0.6);
             const mat = new THREE.MeshBasicMaterial({
-                color: Math.random() > 0.5 ? 0xff4400 : 0xffaa00,
+                color: trailColor,
                 transparent: true, opacity: 0.9,
                 blending: THREE.AdditiveBlending
             });
             const p = new THREE.Mesh(geo, mat);
             p.position.set(
-                playerGroup.position.x - 0.5,
-                playerGroup.position.y + (Math.random() - 0.5) * 0.2,
-                (Math.random() - 0.5) * 0.3
+                playerGroup.position.x - 0.3,
+                playerGroup.position.y,
+                (Math.random() - 0.5) * 0.2
             );
             p.userData = {
-                vx: -0.08 - Math.random() * 0.05,
-                vy: (Math.random() - 0.5) * 0.03,
-                vz: (Math.random() - 0.5) * 0.03,
-                life: 1.0, decay: 0.04 + Math.random() * 0.02
+                vx: -0.04 - Math.random() * 0.02,
+                vy: 0,
+                vz: 0,
+                life: 1.0, decay: 0.05 + Math.random() * 0.02
             };
             scene.add(p);
             particles.push(p);
