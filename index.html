@@ -461,8 +461,8 @@ function createPlayer() {
         metalness: 0.7, roughness: 0.3
     });
     const rNose = new THREE.Mesh(rNoseGeo, rNoseMat);
-    rNose.rotation.z = Math.PI / 2;
-    rNose.position.x = -0.5;
+    rNose.rotation.z = -Math.PI / 2;
+    rNose.position.x = 0.5;
     rocketGroup.add(rNose);
     // Top fin
     const finGeo = new THREE.BoxGeometry(0.3, 0.2, 0.05);
@@ -470,11 +470,11 @@ function createPlayer() {
         color: 0xff0044, emissive: 0xff0022, emissiveIntensity: 0.6
     });
     const topFin = new THREE.Mesh(finGeo, finMat);
-    topFin.position.set(0.25, 0.25, 0);
+    topFin.position.set(-0.25, 0.25, 0);
     rocketGroup.add(topFin);
     // Bottom fin
     const bottomFin = new THREE.Mesh(finGeo, finMat.clone());
-    bottomFin.position.set(0.25, -0.25, 0);
+    bottomFin.position.set(-0.25, -0.25, 0);
     rocketGroup.add(bottomFin);
     // Engine glow
     const engineGeo = new THREE.SphereGeometry(0.12, 8, 6);
@@ -483,7 +483,7 @@ function createPlayer() {
         blending: THREE.AdditiveBlending
     });
     const engine = new THREE.Mesh(engineGeo, engineMat);
-    engine.position.x = 0.4;
+    engine.position.x = -0.4;
     rocketGroup.add(engine);
 
     rocketGroup.visible = false;
@@ -818,7 +818,7 @@ function generateLevel() {
             let pipeX = portalX + 8;
             const pipeEnd = portalX + sectionLength;
             while (pipeX < pipeEnd) {
-                const gapSize = 2.8 - difficulty * 0.8; // Gap shrinks with difficulty (2.8 -> 2.0)
+                const gapSize = 3.5 - difficulty * 0.8; // Gap shrinks with difficulty (3.5 -> 2.7)
                 const gapCenter = 2.0 + Math.random() * 3.0; // Gap center between 2.0 and 5.0
                 const gapTop = gapCenter + gapSize / 2;
 
@@ -834,7 +834,7 @@ function generateLevel() {
                     levelData.push({ type: 'pipe', x: pipeX, isTop: true, gapTop: gapCenter, gapSize: gapSize, pipeHeight: topH });
                 }
 
-                pipeX += 12.0 + Math.random() * 5.0 - difficulty * 2.0; // Pipes get closer with difficulty
+                pipeX += 15.0 + Math.random() * 6.0 - difficulty * 2.5; // Pipes get closer with difficulty
             }
 
             // End portal to switch back
@@ -1693,12 +1693,12 @@ function update(dt) {
             });
             const p = new THREE.Mesh(geo, mat);
             p.position.set(
-                playerGroup.position.x + 0.5,
+                playerGroup.position.x - 0.5,
                 playerGroup.position.y + (Math.random() - 0.5) * 0.2,
                 (Math.random() - 0.5) * 0.3
             );
             p.userData = {
-                vx: 0.08 + Math.random() * 0.05,
+                vx: -0.08 - Math.random() * 0.05,
                 vy: (Math.random() - 0.5) * 0.03,
                 vz: (Math.random() - 0.5) * 0.03,
                 life: 1.0, decay: 0.04 + Math.random() * 0.02
@@ -1774,8 +1774,8 @@ function update(dt) {
             const rotAngle = 0.04 * dt; // gentle backward spin
             rotation += rotAngle;
         } else {
-            // Snap to nearest 90° when grounded
-            const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2);
+            // Snap to nearest 90° + slight rightward tilt when grounded
+            const target = Math.round(rotation / (Math.PI / 2)) * (Math.PI / 2) - 0.15;
             rotation += (target - rotation) * 0.3;
         }
         player.rotation.z = rotation;
