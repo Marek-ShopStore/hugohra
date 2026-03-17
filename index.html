@@ -1500,8 +1500,8 @@ function checkPlatformLanding() {
 
         // Check horizontal overlap
         if (px + halfSize > ox - w + 0.05 && px - halfSize < ox + w - 0.05) {
-            // Player is falling and feet are near platform top
-            if (jumpVelocity <= 0 && py - halfSize <= platTop + 0.15 && py - halfSize >= platTop - 0.3) {
+            // Player is falling and feet are at or below platform top
+            if (jumpVelocity <= 0 && py - halfSize <= platTop + 0.15 && py - halfSize >= platTop - 1.0) {
                 return platTop + halfSize;
             }
         }
@@ -1643,24 +1643,36 @@ function startGame() {
 }
 
 function restartGame() {
-    // Clean up old level
+    // Clean up old level (dispose geometry & materials to free GPU memory)
     for (const obs of obstacles) {
         scene.remove(obs);
+        if (obs.geometry) obs.geometry.dispose();
+        if (obs.material) obs.material.dispose();
     }
     for (const dec of decorations) {
         scene.remove(dec);
+        if (dec.geometry) dec.geometry.dispose();
+        if (dec.material) dec.material.dispose();
     }
     for (const p of particles) {
         scene.remove(p);
+        if (p.geometry) p.geometry.dispose();
+        if (p.material) p.material.dispose();
     }
     for (const p of trailParticles) {
         scene.remove(p);
+        if (p.geometry) p.geometry.dispose();
+        if (p.material) p.material.dispose();
     }
     for (const s of shockwaves) {
         scene.remove(s);
+        if (s.geometry) s.geometry.dispose();
+        if (s.material) s.material.dispose();
     }
     for (const g of groundTiles) {
         scene.remove(g);
+        if (g.geometry) g.geometry.dispose();
+        if (g.material) g.material.dispose();
     }
     for (const c of coins) {
         scene.remove(c);
@@ -1861,6 +1873,8 @@ function update(dt) {
         // Gravity
         if (!isGrounded) {
             jumpVelocity += gravity * dt;
+            // Clamp fall speed to prevent tunneling through platforms
+            if (jumpVelocity < -0.35) jumpVelocity = -0.35;
             playerY += jumpVelocity * dt;
 
             // Block jumping through platform from below
@@ -1926,14 +1940,36 @@ function update(dt) {
 
     // Move world (obstacles come from right to left)
     const moveAmount = speed * dt;
-    for (const obs of obstacles) {
-        obs.position.x -= moveAmount;
+    const cullX = playerGroup.position.x - 15; // remove objects far behind camera
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].position.x -= moveAmount;
+        if (obstacles[i].position.x < cullX) {
+            const obs = obstacles[i];
+            scene.remove(obs);
+            if (obs.geometry) obs.geometry.dispose();
+            if (obs.material) obs.material.dispose();
+            obstacles.splice(i, 1);
+        }
     }
-    for (const dec of decorations) {
-        if (dec.position) dec.position.x -= moveAmount;
+    for (let i = decorations.length - 1; i >= 0; i--) {
+        if (decorations[i].position) decorations[i].position.x -= moveAmount;
+        if (decorations[i].position && decorations[i].position.x < cullX) {
+            const dec = decorations[i];
+            scene.remove(dec);
+            if (dec.geometry) dec.geometry.dispose();
+            if (dec.material) dec.material.dispose();
+            decorations.splice(i, 1);
+        }
     }
-    for (const g of groundTiles) {
-        g.position.x -= moveAmount;
+    for (let i = groundTiles.length - 1; i >= 0; i--) {
+        groundTiles[i].position.x -= moveAmount;
+        if (groundTiles[i].position.x < cullX) {
+            const g = groundTiles[i];
+            scene.remove(g);
+            if (g.geometry) g.geometry.dispose();
+            if (g.material) g.material.dispose();
+            groundTiles.splice(i, 1);
+        }
     }
     for (const portal of portals) {
         portal.position.x -= moveAmount;
@@ -2111,15 +2147,16 @@ function animate(timestamp) {
     const rawDt = (timestamp - lastTime) / (1000 / TARGET_FPS);
     lastTime = timestamp;
     // Clamp delta so big lag spikes don't cause huge jumps
-    const dt = Math.min(rawDt, 3);
+    const dt = Math.min(rawDt, 2);
 
     update(dt);
 
     // Background color pulse
     const bgHue = (colorPhase * 0.5) % 1;
-    const bgColor = new THREE.Color().setHSL(bgHue, 0.3, 0.02);
-    scene.background = bgColor;
-    scene.fog.color.copy(bgColor);
+    if (!scene._bgColor) scene._bgColor = new THREE.Color();
+    scene._bgColor.setHSL(bgHue, 0.3, 0.02);
+    scene.background = scene._bgColor;
+    scene.fog.color.copy(scene._bgColor);
 
     renderer.render(scene, camera);
 }
