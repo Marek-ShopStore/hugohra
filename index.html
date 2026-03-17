@@ -257,7 +257,7 @@ let isDead = false;
 let speed = 0.12;
 let baseSpeed = 0.12;
 let score = 0;
-let bestScore = 0;
+let bestScore = parseInt(localStorage.getItem('gd_bestScore') || '0', 10);
 let attempts = 1;
 let distance = 0;
 let totalLevelLength = 900;
@@ -970,10 +970,10 @@ function generateLevel() {
             // End portal to switch back, with walls above and below to force going through
             const exitPortalX = pipeEnd + 3;
             levelData.push({ type: 'portal', x: exitPortalX, toRocket: false, portalY: 2.5 });
-            // Wall above portal - blocks flying over
-            levelData.push({ type: 'pipe', x: exitPortalX, isTop: true, gapTop: 2.5, gapSize: 3.0, pipeHeight: 5.0 });
+            // Wall above portal - blocks flying over (big gap for big portal)
+            levelData.push({ type: 'pipe', x: exitPortalX, isTop: true, gapTop: 2.5, gapSize: 5.5, pipeHeight: 5.0 });
             // Wall below portal
-            levelData.push({ type: 'pipe', x: exitPortalX, isTop: false, gapTop: 2.5, gapSize: 3.0, pipeHeight: 1.0 });
+            levelData.push({ type: 'pipe', x: exitPortalX, isTop: false, gapTop: 2.5, gapSize: 5.5, pipeHeight: 1.0 });
 
             pos = pipeEnd + 10;
             continue;
@@ -1205,9 +1205,10 @@ function createObstacle(data) {
         // Portal - glowing ring that switches mode
         const portalGroup = new THREE.Group();
         const portalColor = data.toRocket ? 0xff8800 : 0x00ffff;
+        const portalScale = data.toRocket ? 1.0 : 2.2; // Exit portal much bigger
 
         // Outer ring
-        const ringGeo = new THREE.TorusGeometry(1.2, 0.12, 16, 32);
+        const ringGeo = new THREE.TorusGeometry(1.2 * portalScale, 0.12 * portalScale, 16, 32);
         const ringMat = new THREE.MeshStandardMaterial({
             color: portalColor, emissive: portalColor, emissiveIntensity: 1.2,
             metalness: 0.9, roughness: 0.1
@@ -1217,7 +1218,7 @@ function createObstacle(data) {
         portalGroup.add(ring);
 
         // Inner glow
-        const innerGeo = new THREE.CircleGeometry(1.0, 32);
+        const innerGeo = new THREE.CircleGeometry(1.0 * portalScale, 32);
         const innerMat = new THREE.MeshBasicMaterial({
             color: portalColor, transparent: true, opacity: 0.3,
             side: THREE.DoubleSide, blending: THREE.AdditiveBlending
@@ -1227,7 +1228,7 @@ function createObstacle(data) {
         portalGroup.add(inner);
 
         // Point light
-        const pLight = new THREE.PointLight(portalColor, 3, 8);
+        const pLight = new THREE.PointLight(portalColor, 3 * portalScale, 8 * portalScale);
         portalGroup.add(pLight);
 
         const portalY = data.portalY || 2.0;
@@ -1515,7 +1516,8 @@ function checkPortalCollision() {
         if (portal.userData.passed) continue;
         const ox = portal.position.x;
         const oy = portal.userData.portalY;
-        if (Math.abs(px - ox) < 1.0 && Math.abs(py - oy) < 2.0) {
+        const portalRadius = portal.userData.toRocket ? 1.5 : 3.0;
+        if (Math.abs(px - ox) < 1.5 && Math.abs(py - oy) < portalRadius) {
             portal.userData.passed = true;
             const toRocket = portal.userData.toRocket;
             if (toRocket && !isRocketMode) {
@@ -1725,7 +1727,7 @@ function die() {
 
     // Calculate score
     const percent = Math.floor((distance / totalLevelLength) * 100);
-    if (percent > bestScore) bestScore = percent;
+    if (percent > bestScore) { bestScore = percent; localStorage.setItem('gd_bestScore', bestScore); }
 
     setTimeout(() => {
         document.getElementById('death-screen').style.display = 'flex';
@@ -1982,7 +1984,7 @@ function update(dt) {
         }
         gameRunning = false;
         const percent2 = 100;
-        if (percent2 > bestScore) bestScore = percent2;
+        if (percent2 > bestScore) { bestScore = percent2; localStorage.setItem('gd_bestScore', bestScore); }
         setTimeout(() => {
             document.getElementById('death-screen').style.display = 'flex';
             document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
