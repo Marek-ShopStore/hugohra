@@ -232,7 +232,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.9</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v2.0</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -797,16 +797,17 @@ function generateLevel() {
         const r = Math.random();
 
         // Big generous gaps - plenty of time to react
-        // 5 units at start, shrinking to 3.5 at max difficulty
-        const minReactGap = 5.0 - difficulty * 1.5;
+        // 5 units at start, shrinking to 4.0 at max difficulty
+        const minReactGap = 5.0 - difficulty * 1.0;
 
         let groupObstacles = [];
 
-        // Spike height varies with difficulty
+        // Spike height varies with difficulty, capped to jumpable height
+        const maxSpikeH = maxJumpableHeight * 0.85; // never exceed 85% of max jump
         const spikeH = () => {
             const base = 1.0;
-            const extra = difficulty * 1.0 * Math.random();
-            return base + extra; // 1.0 to 2.0
+            const extra = difficulty * 0.6 * Math.random();
+            return Math.min(base + extra, maxSpikeH); // 1.0 to ~1.6, capped
         };
 
         // Only spikes (some tall) and connected platforms with spikes underneath
@@ -845,14 +846,14 @@ function generateLevel() {
                 // Double spike, mixed heights
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0, spikeHeight: 1.0 },
-                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: 1.5 + Math.random() * 0.5 },
+                    { type: 'spike', x: pos + 1.2, y: 0, spikeHeight: spikeH() },
                 ];
             } else if (r < 0.5) {
                 // Triple spike with height variation
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
-                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: 1.6 + Math.random() * 0.4 },
-                    { type: 'spike', x: pos + 2.0, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 1.1, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 2.2, y: 0, spikeHeight: spikeH() },
                 ];
             } else if (r < 0.75) {
                 // Connected ascending platforms with spikes
@@ -873,7 +874,7 @@ function generateLevel() {
                 const pw = 2.0 + Math.random() * 0.5;
                 let py = 1.1 + Math.random() * 0.3;
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.3 + Math.random() * 0.5 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
                 ];
                 for (let s = 0; s < 2; s++) {
                     const px = pos + 2.0 + s * (pw - 0.1);
@@ -887,23 +888,23 @@ function generateLevel() {
             if (r < 0.15) {
                 // Double tall spikes
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.4 + Math.random() * 0.6 },
-                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: 1.4 + Math.random() * 0.6 },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 1.2, y: 0, spikeHeight: spikeH() },
                 ];
             } else if (r < 0.3) {
                 // Triple mixed height spikes
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0, spikeHeight: 1.0 },
-                    { type: 'spike', x: pos + 0.9, y: 0, spikeHeight: 1.8 + Math.random() * 0.2 },
-                    { type: 'spike', x: pos + 1.8, y: 0, spikeHeight: 1.2 },
+                    { type: 'spike', x: pos + 1.1, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 2.2, y: 0, spikeHeight: 1.0 },
                 ];
             } else if (r < 0.45) {
                 // Quad spikes with height variation
                 groupObstacles = [
                     { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
-                    { type: 'spike', x: pos + 0.85, y: 0, spikeHeight: 1.6 + Math.random() * 0.4 },
-                    { type: 'spike', x: pos + 1.7, y: 0, spikeHeight: spikeH() },
-                    { type: 'spike', x: pos + 2.55, y: 0, spikeHeight: 1.5 + Math.random() * 0.5 },
+                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 2.0, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 3.0, y: 0, spikeHeight: spikeH() },
                 ];
             } else if (r < 0.7) {
                 // Long connected platform staircase going high into the air
@@ -922,8 +923,8 @@ function generateLevel() {
                 const pw = 1.8 + Math.random() * 0.6;
                 let py = 1.2 + Math.random() * 0.3;
                 groupObstacles = [
-                    { type: 'spike', x: pos, y: 0, spikeHeight: 1.5 + Math.random() * 0.5 },
-                    { type: 'spike', x: pos + 1.0, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos, y: 0, spikeHeight: spikeH() },
+                    { type: 'spike', x: pos + 1.2, y: 0, spikeHeight: spikeH() },
                 ];
                 for (let s = 0; s < 3; s++) {
                     const px = pos + 2.5 + s * (pw - 0.1);
@@ -966,8 +967,13 @@ function generateLevel() {
                 pipeX += 15.0 + Math.random() * 6.0 - difficulty * 2.5; // Pipes get closer with difficulty
             }
 
-            // End portal to switch back
-            levelData.push({ type: 'portal', x: pipeEnd + 3, toRocket: false, portalY: 2.5 });
+            // End portal to switch back, with walls above and below to force going through
+            const exitPortalX = pipeEnd + 3;
+            levelData.push({ type: 'portal', x: exitPortalX, toRocket: false, portalY: 2.5 });
+            // Wall above portal - blocks flying over
+            levelData.push({ type: 'pipe', x: exitPortalX, isTop: true, gapTop: 2.5, gapSize: 3.0, pipeHeight: 5.0 });
+            // Wall below portal
+            levelData.push({ type: 'pipe', x: exitPortalX, isTop: false, gapTop: 2.5, gapSize: 3.0, pipeHeight: 1.0 });
 
             pos = pipeEnd + 10;
             continue;
@@ -1602,6 +1608,11 @@ function checkCoinCollection() {
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('death-screen').style.display = 'none';
+    // Reset death screen text in case it was changed to HOTOVO
+    const deathH2 = document.getElementById('death-screen').querySelector('h2');
+    deathH2.textContent = 'CRASH!';
+    deathH2.style.color = '#f33';
+    deathH2.style.textShadow = '0 0 20px #f00, 0 0 40px #f00';
     gameRunning = true;
     gameStarted = true;
     isDead = false;
