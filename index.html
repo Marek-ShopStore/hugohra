@@ -1827,7 +1827,7 @@ function update(dt) {
         rocketMesh.rotation.z = rotation;
 
         // Engine particles when thrusting
-        if (jumpPressed && Math.random() < 0.7) {
+        if (jumpPressed && Math.random() < 0.35) {
             const geo = new THREE.SphereGeometry(0.06, 4, 4);
             const mat = new THREE.MeshBasicMaterial({
                 color: Math.random() > 0.5 ? 0xff4400 : 0xffaa00,
@@ -1947,7 +1947,7 @@ function update(dt) {
     playerGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
     // Trail particles
-    if (Math.random() < (IS_MOBILE ? 0.3 : 0.6)) {
+    if (Math.random() < (IS_MOBILE ? 0.15 : 0.3)) {
         spawnTrailParticle();
     }
 
@@ -2004,8 +2004,7 @@ function update(dt) {
 
     // Camera stays fixed on player (no drift)
     camera.position.x = playerGroup.position.x;
-    const camTargetY = isRocketMode ? Math.max(3.5, playerY + 1.0) : 3;
-    camera.position.y = camTargetY + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
+    camera.position.y = 3 + Math.sin(Date.now() * 0.001) * 0.1 + beatPulse * 0.5;
 
     // Camera shake
     if (cameraShake > 0) {
@@ -2032,8 +2031,17 @@ function updateParticles(dt) {
 
         if (p.userData.life <= 0) {
             scene.remove(p);
+            p.geometry.dispose();
+            p.material.dispose();
             trailParticles.splice(i, 1);
         }
+    }
+    // Cap trail particles
+    while (trailParticles.length > 40) {
+        const old = trailParticles.shift();
+        scene.remove(old);
+        old.geometry.dispose();
+        old.material.dispose();
     }
 
     // Explosion particles
@@ -2056,8 +2064,17 @@ function updateParticles(dt) {
 
         if (p.userData.life <= 0) {
             scene.remove(p);
+            p.geometry.dispose();
+            p.material.dispose();
             particles.splice(i, 1);
         }
+    }
+    // Cap explosion particles
+    while (particles.length > 80) {
+        const old = particles.shift();
+        scene.remove(old);
+        old.geometry.dispose();
+        old.material.dispose();
     }
 }
 
@@ -2072,6 +2089,8 @@ function updateShockwaves(dt) {
 
         if (sw.userData.life <= 0) {
             scene.remove(sw);
+            sw.geometry.dispose();
+            sw.material.dispose();
             shockwaves.splice(i, 1);
         }
     }
