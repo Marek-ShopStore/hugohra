@@ -232,7 +232,7 @@
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
-<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.8</div>
+<div id="version-display" style="position:fixed;bottom:6px;right:10px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:11px;z-index:1;pointer-events:none;">v1.9</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -274,7 +274,10 @@ let jumpPressed = false;
 let isRocketMode = false;
 let rocketMesh = null;
 let portals = [];
-const WAVE_SPEED = 0.13;
+const ROCKET_GRAVITY = -0.008;
+const ROCKET_THRUST = 0.014;
+const ROCKET_MAX_VY = 0.18;
+const ROCKET_MIN_VY = -0.18;
 const ROCKET_CEILING = 6.5;
 const ROCKET_FLOOR = 0.8;
 let cameraShake = 0;
@@ -297,6 +300,135 @@ const TOTAL_COINS = 5;
 
 const PLAYER_SIZE = 0.55;
 const GROUND_LEVEL = 0.6;
+
+// --- MUSIC ---
+let audioCtx = null;
+let musicPlaying = false;
+let musicGain = null;
+let musicInterval = null;
+
+function initMusic() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    musicGain = audioCtx.createGain();
+    musicGain.gain.value = 0.35;
+    musicGain.connect(audioCtx.destination);
+}
+
+function playNote(freq, duration, time, type, gainVal) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = type || 'square';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gainVal || 0.15, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + duration);
+    osc.connect(g);
+    g.connect(musicGain);
+    osc.start(time);
+    osc.stop(time + duration);
+}
+
+function playKick(time) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(30, time + 0.15);
+    g.gain.setValueAtTime(0.5, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    osc.connect(g);
+    g.connect(musicGain);
+    osc.start(time);
+    osc.stop(time + 0.2);
+}
+
+function playHihat(time) {
+    if (!audioCtx) return;
+    const bufSize = audioCtx.sampleRate * 0.05;
+    const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.08, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 8000;
+    src.connect(hp);
+    hp.connect(g);
+    g.connect(musicGain);
+    src.start(time);
+}
+
+function startMusic() {
+    initMusic();
+    if (musicPlaying) return;
+    musicPlaying = true;
+
+    // Energetic EDM/dubstep pattern
+    const bpm = 140;
+    const beatLen = 60 / bpm;
+
+    // Bass notes - driving bassline (minor key, E minor)
+    const bassNotes = [82.41, 98.0, 110.0, 82.41, 73.42, 82.41, 98.0, 110.0]; // E2, G2, A2, E2, D2, E2, G2, A2
+    // Lead melody
+    const melodyNotes = [329.6, 392.0, 440.0, 392.0, 329.6, 293.7, 329.6, 440.0,
+                         523.3, 440.0, 392.0, 329.6, 392.0, 440.0, 523.3, 587.3];
+
+    let barIndex = 0;
+    function scheduleBar() {
+        if (!musicPlaying || !audioCtx) return;
+        const now = audioCtx.currentTime + 0.05;
+
+        for (let beat = 0; beat < 8; beat++) {
+            const t = now + beat * beatLen;
+
+            // Kick on every beat
+            playKick(t);
+
+            // Hi-hat on off-beats
+            playHihat(t + beatLen * 0.5);
+            if (beat % 2 === 1) playHihat(t + beatLen * 0.25);
+
+            // Bass - square wave
+            const bassNote = bassNotes[beat % bassNotes.length];
+            playNote(bassNote, beatLen * 0.8, t, 'sawtooth', 0.12);
+
+            // Melody - plays every other beat with variation
+            if (beat % 2 === 0) {
+                const melIdx = ((barIndex * 4) + (beat / 2)) % melodyNotes.length;
+                playNote(melodyNotes[melIdx], beatLen * 0.6, t, 'square', 0.08);
+                // Harmony
+                playNote(melodyNotes[melIdx] * 1.25, beatLen * 0.4, t + beatLen * 0.1, 'triangle', 0.04);
+            }
+
+            // Arp on some beats for texture
+            if (beat % 4 === 2) {
+                const arpFreqs = [523.3, 659.3, 784.0, 659.3];
+                for (let a = 0; a < 4; a++) {
+                    playNote(arpFreqs[a], beatLen * 0.15, t + a * beatLen * 0.25, 'sine', 0.05);
+                }
+            }
+        }
+
+        barIndex++;
+        musicInterval = setTimeout(scheduleBar, beatLen * 8 * 1000 - 50);
+    }
+
+    scheduleBar();
+}
+
+function stopMusic() {
+    musicPlaying = false;
+    if (musicInterval) {
+        clearTimeout(musicInterval);
+        musicInterval = null;
+    }
+}
 
 // --- INIT ---
 function init() {
@@ -1474,6 +1606,7 @@ function startGame() {
     gameStarted = true;
     isDead = false;
     distance = 0;
+    startMusic();
     score = 0;
     playerY = GROUND_LEVEL;
     jumpVelocity = 0;
@@ -1556,6 +1689,7 @@ function die() {
     if (isDead) return;
     isDead = true;
     gameRunning = false;
+    stopMusic();
 
     const px = playerGroup.position.x;
     const py = playerGroup.position.y;
@@ -1652,53 +1786,52 @@ function update(dt) {
     checkPortalCollision();
 
     if (isRocketMode) {
-        // --- WAVE MODE (Geometry Dash style) ---
-        // Constant diagonal movement: hold = up, release = down
+        // --- FLAPPY BIRD MODE ---
         if (jumpPressed) {
-            jumpVelocity = WAVE_SPEED;
+            jumpVelocity += ROCKET_THRUST * dt;
         } else {
-            jumpVelocity = -WAVE_SPEED;
+            jumpVelocity += ROCKET_GRAVITY * dt;
         }
+        // Clamp velocity
+        jumpVelocity = Math.max(ROCKET_MIN_VY, Math.min(ROCKET_MAX_VY, jumpVelocity));
         playerY += jumpVelocity * dt;
 
-        // Ceiling and floor - die on hit
+        // Ceiling and floor
         if (playerY >= ROCKET_CEILING) {
             playerY = ROCKET_CEILING;
             jumpVelocity = 0;
         }
         if (playerY <= ROCKET_FLOOR) {
             playerY = ROCKET_FLOOR;
-            jumpVelocity = 0;
+            jumpVelocity = Math.max(jumpVelocity, 0);
         }
 
         playerGroup.position.y = playerY;
 
-        // Wave tilts at 45° angle based on direction
-        const targetTilt = jumpPressed ? 0.6 : -0.6;
-        rotation += (targetTilt - rotation) * 0.3;
+        // Rocket tilts based on velocity
+        const targetTilt = jumpVelocity * 3.0;
+        rotation += (targetTilt - rotation) * 0.15;
         rocketMesh.rotation.z = rotation;
 
-        // Trail particles behind the wave
-        if (Math.random() < 0.8) {
-            const geo = new THREE.SphereGeometry(0.05, 4, 4);
-            const hue = (colorPhase + Math.random() * 0.1) % 1;
-            const trailColor = new THREE.Color().setHSL(hue, 1, 0.6);
+        // Engine particles when thrusting
+        if (jumpPressed && Math.random() < 0.7) {
+            const geo = new THREE.SphereGeometry(0.06, 4, 4);
             const mat = new THREE.MeshBasicMaterial({
-                color: trailColor,
+                color: Math.random() > 0.5 ? 0xff4400 : 0xffaa00,
                 transparent: true, opacity: 0.9,
                 blending: THREE.AdditiveBlending
             });
             const p = new THREE.Mesh(geo, mat);
             p.position.set(
-                playerGroup.position.x - 0.3,
-                playerGroup.position.y,
-                (Math.random() - 0.5) * 0.2
+                playerGroup.position.x - 0.5,
+                playerGroup.position.y + (Math.random() - 0.5) * 0.2,
+                (Math.random() - 0.5) * 0.3
             );
             p.userData = {
-                vx: -0.04 - Math.random() * 0.02,
-                vy: 0,
-                vz: 0,
-                life: 1.0, decay: 0.05 + Math.random() * 0.02
+                vx: -0.08 - Math.random() * 0.05,
+                vy: (Math.random() - 0.5) * 0.03,
+                vz: (Math.random() - 0.5) * 0.03,
+                life: 1.0, decay: 0.04 + Math.random() * 0.02
             };
             scene.add(p);
             particles.push(p);
@@ -1824,6 +1957,7 @@ function update(dt) {
 
     // Win condition
     if (distance >= totalLevelLength) {
+        stopMusic();
         // Victory explosion!
         for (let i = 0; i < 5; i++) {
             setTimeout(() => {
