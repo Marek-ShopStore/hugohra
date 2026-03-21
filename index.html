@@ -869,7 +869,7 @@ function generateLevel() {
                     }
                     py += 0.4 + Math.random() * 0.3;
                 }
-            } else {
+            } else if (r < 0.88) {
                 // Spike then connected platforms going up
                 const pw = 2.0 + Math.random() * 0.5;
                 let py = 1.1 + Math.random() * 0.3;
@@ -881,6 +881,27 @@ function generateLevel() {
                     groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
                     groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
                     py += 0.5 + Math.random() * 0.3;
+                }
+            } else {
+                // SMALL SKY BRIDGE: platforms up -> short flat section with spikes -> fall back
+                const pw = 2.0;
+                const skyHeight = 2.2 + Math.random() * 0.8;
+                groupObstacles = [];
+
+                // Two-step staircase
+                groupObstacles.push({ type: 'platform', x: pos, y: 0, width: pw, platformY: 1.1 });
+                groupObstacles.push({ type: 'platform', x: pos + pw - 0.1, y: 0, width: pw, platformY: skyHeight });
+
+                // Flat bridge with a spike on it
+                const bridgeStart = pos + 2 * (pw - 0.1);
+                const platH = 0.35;
+                const bridgeTop = skyHeight + platH / 2;
+                for (let s = 0; s < 2; s++) {
+                    const px = bridgeStart + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: skyHeight });
+                    if (s === 0) {
+                        groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: 0.7, baseY: bridgeTop });
+                    }
                 }
             }
         } else {
@@ -918,7 +939,7 @@ function generateLevel() {
                     groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
                     py += 0.4 + Math.random() * 0.4; // goes higher and higher
                 }
-            } else {
+            } else if (r < 0.85) {
                 // Spike gauntlet into connected ascending platforms
                 const pw = 1.8 + Math.random() * 0.6;
                 let py = 1.2 + Math.random() * 0.3;
@@ -931,6 +952,41 @@ function generateLevel() {
                     groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
                     groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
                     py += 0.5 + Math.random() * 0.3;
+                }
+            } else {
+                // SKY BRIDGE: staircase up -> flat high section with spikes -> fall back down
+                const pw = 2.0;
+                const skyHeight = 3.0 + Math.random() * 1.0; // high platform level
+                const stairSteps = 3;
+                const bridgeSegments = 3 + Math.floor(Math.random() * 2);
+                groupObstacles = [];
+
+                // Ascending staircase to reach the sky bridge
+                let stepY = 1.0;
+                const stepInc = (skyHeight - stepY) / stairSteps;
+                for (let s = 0; s < stairSteps; s++) {
+                    const px = pos + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: stepY });
+                    stepY += stepInc;
+                }
+
+                // Flat sky bridge with spikes on top
+                const bridgeStart = pos + stairSteps * (pw - 0.1);
+                const platH = 0.35;
+                const bridgeTop = skyHeight + platH / 2;
+                for (let s = 0; s < bridgeSegments; s++) {
+                    const px = bridgeStart + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: skyHeight });
+                    // Spike sitting on top of the platform
+                    if (s > 0 && s < bridgeSegments - 1) {
+                        groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: 0.8, baseY: bridgeTop });
+                    }
+                }
+
+                // Ground spikes underneath to punish early falling
+                for (let s = 0; s < 2; s++) {
+                    const px = bridgeStart + (s + 1) * (pw - 0.1);
+                    groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
                 }
             }
         }
@@ -1064,6 +1120,7 @@ function createObstacle(data) {
 
     if (data.type === 'spike') {
         const spikeH = data.spikeHeight || 1.0;
+        const baseY = data.baseY || 0;
         const spikeR = 0.4 * (0.7 + spikeH * 0.3);
         const geo = new THREE.ConeGeometry(spikeR, spikeH, 4);
         const mat = new THREE.MeshStandardMaterial({
@@ -1074,7 +1131,7 @@ function createObstacle(data) {
             roughness: 0.3,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(data.x, spikeH / 2, 0);
+        mesh.position.set(data.x, baseY + spikeH / 2, 0);
         mesh.castShadow = true;
 
         // Glow ring at base
@@ -1087,7 +1144,7 @@ function createObstacle(data) {
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(data.x, 0.05, 0);
+        ring.position.set(data.x, baseY + 0.05, 0);
         scene.add(ring);
         decorations.push(ring);
 
