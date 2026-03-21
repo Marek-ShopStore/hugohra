@@ -282,6 +282,10 @@ const ROCKET_CEILING = 6.5;
 const ROCKET_FLOOR = 0.8;
 let cameraShake = 0;
 let beatPulse = 0;
+let trophy = null;
+let winAnimating = false;
+let winAnimDone = false;
+let winAnimTime = 0;
 let colorPhase = 0;
 let obstacleTimer = 0;
 let difficultyRamp = 0;
@@ -1077,6 +1081,81 @@ function generateLevel() {
         const coinX = sectionLength * (i + 1);
         createCoin(coinX, coinY);
     }
+
+    // Place trophy at the end of the level
+    createTrophy(totalLevelLength + 5);
+}
+
+function createTrophy(x) {
+    const trophyGroup = new THREE.Group();
+
+    // Cup body (wider at top, narrow at bottom)
+    const cupGeo = new THREE.CylinderGeometry(0.5, 0.25, 1.0, 16);
+    const goldMat = new THREE.MeshStandardMaterial({
+        color: 0xffd700,
+        emissive: 0xffaa00,
+        emissiveIntensity: 1.2,
+        metalness: 1.0,
+        roughness: 0.1,
+    });
+    const cup = new THREE.Mesh(cupGeo, goldMat);
+    cup.position.y = 1.0;
+    trophyGroup.add(cup);
+
+    // Base/pedestal
+    const baseGeo = new THREE.CylinderGeometry(0.35, 0.45, 0.3, 16);
+    const base = new THREE.Mesh(baseGeo, goldMat);
+    base.position.y = 0.35;
+    trophyGroup.add(base);
+
+    // Stem
+    const stemGeo = new THREE.CylinderGeometry(0.1, 0.15, 0.4, 8);
+    const stem = new THREE.Mesh(stemGeo, goldMat);
+    stem.position.y = 0.6;
+    trophyGroup.add(stem);
+
+    // Handles (two torus arcs on sides)
+    const handleGeo = new THREE.TorusGeometry(0.25, 0.05, 8, 16, Math.PI);
+    for (let side of [-1, 1]) {
+        const handle = new THREE.Mesh(handleGeo, goldMat);
+        handle.position.set(side * 0.5, 1.0, 0);
+        handle.rotation.z = side * Math.PI / 2;
+        trophyGroup.add(handle);
+    }
+
+    // Star on top
+    const starGeo = new THREE.OctahedronGeometry(0.18, 0);
+    const starMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffffaa,
+        emissiveIntensity: 2.0,
+        metalness: 0.9,
+        roughness: 0.0,
+    });
+    const star = new THREE.Mesh(starGeo, starMat);
+    star.position.y = 1.65;
+    trophyGroup.add(star);
+
+    // Glow around trophy
+    const glowGeo = new THREE.SphereGeometry(1.2, 16, 12);
+    const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xffd700,
+        transparent: true,
+        opacity: 0.15,
+        blending: THREE.AdditiveBlending,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 1.0;
+    trophyGroup.add(glow);
+
+    // Light
+    const trophyLight = new THREE.PointLight(0xffd700, 3, 10);
+    trophyLight.position.y = 1.5;
+    trophyGroup.add(trophyLight);
+
+    trophyGroup.position.set(x, GROUND_LEVEL - 0.6 + 0.2, 0);
+    scene.add(trophyGroup);
+    trophy = trophyGroup;
 }
 
 function createCoin(x, y) {
@@ -1502,7 +1581,7 @@ function spawnJumpBurst() {
 function checkCollision() {
     const px = playerGroup.position.x;
     const py = playerGroup.position.y;
-    const halfSize = PLAYER_SIZE * 0.32; // Slightly forgiving hitbox
+    const halfSize = PLAYER_SIZE * 0.42; // Tight hitbox - die on slight touch
 
     for (const obs of obstacles) {
         const ox = obs.position.x;
@@ -1518,8 +1597,8 @@ function checkCollision() {
             const dy = py - oy;
             // Cone collision: wider at base, narrow at top
             const heightFraction = Math.max(0, (sH/2 - dy) / sH);
-            const effectiveRadius = sR * heightFraction;
-            if (Math.abs(dx) < halfSize + effectiveRadius && dy < sH * 0.4 && dy > -sH * 0.5) {
+            const effectiveRadius = sR * heightFraction * 1.15;
+            if (Math.abs(dx) < halfSize + effectiveRadius && dy < sH * 0.5 && dy > -sH * 0.5) {
                 return true;
             }
         }
@@ -1688,6 +1767,10 @@ function startGame() {
     lastTime = 0;
 
     isRocketMode = false;
+    winAnimating = false;
+    winAnimDone = false;
+    winAnimTime = 0;
+    if (trophy) { scene.remove(trophy); trophy = null; }
     if (rocketMesh) rocketMesh.visible = false;
     player.visible = true;
     playerGroup.children[1].visible = true;
@@ -2061,31 +2144,22 @@ function update(dt) {
         coin.children[0].position.y = Math.sin(Date.now() * 0.003 + coin.position.x) * 0.15;
     }
 
-    // Win condition
-    if (distance >= totalLevelLength) {
+    // Win condition - start ride-to-trophy animation
+    if (distance >= totalLevelLength && !winAnimating) {
         stopMusic();
-        // Victory explosion!
-        for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-                spawnExplosion(
-                    playerGroup.position.x + (Math.random() - 0.5) * 3,
-                    playerGroup.position.y + Math.random() * 3,
-                    playerGroup.position.z + (Math.random() - 0.5) * 3,
-                    50, Math.random()
-                );
-            }, i * 200);
-        }
+        winAnimating = true;
+        winAnimTime = 0;
         gameRunning = false;
-        const percent2 = 100;
-        if (percent2 > bestScore) { bestScore = percent2; localStorage.setItem('gd_bestScore', bestScore); }
-        setTimeout(() => {
-            document.getElementById('death-screen').style.display = 'flex';
-            document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
-            document.getElementById('death-screen').querySelector('h2').style.color = '#0f0';
-            document.getElementById('death-screen').querySelector('h2').style.textShadow = '0 0 20px #0f0, 0 0 40px #0f0';
-            document.getElementById('death-score').textContent = `Skóre: 100% | Coiny: ${collectedCoins}/${TOTAL_COINS}`;
-            document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
-        }, 1200);
+    }
+
+    // Move trophy with the world
+    if (trophy) {
+        trophy.position.x -= moveAmount;
+        // Spin the star on top & bob
+        if (trophy.children[4]) {
+            trophy.children[4].rotation.y += 0.05 * dt;
+        }
+        trophy.children[0].position.y = 1.0 + Math.sin(Date.now() * 0.002) * 0.05;
     }
 
     // Obstacles spinning
@@ -2207,6 +2281,70 @@ function animate(timestamp) {
     const dt = Math.min(rawDt, 2);
 
     update(dt);
+
+    // Win animation: cube rides towards trophy
+    if (winAnimating && trophy) {
+        winAnimTime += dt;
+        const trophyX = trophy.position.x;
+        const dx = trophyX - playerGroup.position.x;
+
+        if (dx > 0.3) {
+            // Cube slides towards trophy
+            const slideSpeed = 0.08 * dt;
+            playerGroup.position.x += slideSpeed;
+            playerGroup.position.y = GROUND_LEVEL;
+            player.rotation.z -= 0.08 * dt;
+            camera.position.x = playerGroup.position.x;
+
+            // Trail while sliding
+            if (Math.random() < 0.4) spawnTrailParticle();
+        } else {
+            // Reached the trophy! Fireworks + show HOTOVO
+            if (!winAnimDone) {
+                winAnimDone = true;
+
+                // Big victory explosions
+                for (let i = 0; i < 8; i++) {
+                    setTimeout(() => {
+                        if (!trophy) return;
+                        spawnExplosion(
+                            trophy.position.x + (Math.random() - 0.5) * 4,
+                            trophy.position.y + 1 + Math.random() * 3,
+                            (Math.random() - 0.5) * 3,
+                            50, Math.random()
+                        );
+                        cameraShake = 0.3;
+                    }, i * 300);
+                }
+
+                // Save score
+                if (100 > bestScore) {
+                    bestScore = 100;
+                    localStorage.setItem('gd_bestScore', bestScore);
+                }
+
+                // Show HOTOVO after fireworks
+                setTimeout(() => {
+                    document.getElementById('death-screen').style.display = 'flex';
+                    document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
+                    document.getElementById('death-screen').querySelector('h2').style.color = '#0f0';
+                    document.getElementById('death-screen').querySelector('h2').style.textShadow = '0 0 20px #0f0, 0 0 40px #0f0';
+                    document.getElementById('death-score').textContent = `Skóre: 100% | Coiny: ${collectedCoins}/${TOTAL_COINS}`;
+                    document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
+                }, 2000);
+            }
+
+            // Cube stays next to trophy, bobbing
+            playerGroup.position.x = trophyX - 0.3;
+            playerGroup.position.y = GROUND_LEVEL + Math.sin(Date.now() * 0.005) * 0.1;
+            player.rotation.z = 0;
+            camera.position.x = playerGroup.position.x;
+        }
+
+        // Update particles even during win animation
+        updateParticles(dt);
+        updateShockwaves(dt);
+    }
 
     // Background color pulse
     const bgHue = (colorPhase * 0.5) % 1;
