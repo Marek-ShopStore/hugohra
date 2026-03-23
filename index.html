@@ -50,20 +50,9 @@
             z-index: 20;
         }
 
-        #coin-display {
-            position: fixed;
-            top: 45px; right: 15px;
-            color: #ffd700;
-            font-size: clamp(14px, 3vw, 22px);
-            font-weight: 900;
-            text-shadow: 0 0 10px #ffd700, 0 0 20px #ff8800;
-            z-index: 20;
-            letter-spacing: 1px;
-        }
-
         #gem-display {
             position: fixed;
-            top: 70px; right: 15px;
+            top: 45px; right: 15px;
             color: #00aaff;
             font-size: clamp(14px, 3vw, 22px);
             font-weight: 900;
@@ -219,12 +208,118 @@
         .flash-active {
             opacity: 0.8;
         }
+
+        #shop-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: all;
+            background: radial-gradient(ellipse at center, rgba(0,10,30,0.97) 0%, rgba(0,0,0,0.99) 100%);
+        }
+        #shop-screen h2 {
+            font-size: clamp(28px, 7vw, 48px);
+            font-weight: 900;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff, 0 0 40px #08f;
+            margin-bottom: 8px;
+            letter-spacing: 4px;
+        }
+        #shop-gems-display {
+            font-size: clamp(16px, 4vw, 24px);
+            color: #00aaff;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00aaff;
+        }
+        .shop-items {
+            display: flex;
+            gap: clamp(10px, 3vw, 25px);
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 0 15px;
+            max-width: 600px;
+        }
+        .shop-item {
+            width: clamp(100px, 25vw, 150px);
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: clamp(10px, 2vw, 18px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .shop-item:hover {
+            border-color: #0ff;
+            box-shadow: 0 0 20px rgba(0,255,255,0.3);
+            transform: scale(1.05);
+        }
+        .shop-item.owned {
+            border-color: #0a0;
+        }
+        .shop-item.active {
+            border-color: #0ff;
+            box-shadow: 0 0 25px rgba(0,255,255,0.5);
+            background: rgba(0,255,255,0.1);
+        }
+        .shop-item-preview {
+            width: clamp(50px, 14vw, 80px);
+            height: clamp(50px, 14vw, 80px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(32px, 9vw, 50px);
+            margin-bottom: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+        .shop-item-name {
+            font-size: clamp(11px, 2.5vw, 14px);
+            color: #ccc;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .shop-item-price {
+            font-size: clamp(10px, 2vw, 13px);
+            color: #00aaff;
+            font-weight: 600;
+        }
+        .shop-item-status {
+            font-size: clamp(10px, 2vw, 12px);
+            color: #0f0;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        #shop-back-btn {
+            margin-top: clamp(15px, 3vw, 25px);
+            padding: clamp(8px, 2vw, 12px) clamp(25px, 6vw, 45px);
+            font-size: clamp(14px, 3vw, 18px);
+            font-weight: 800;
+            border: 2px solid #888;
+            background: transparent;
+            color: #aaa;
+            cursor: pointer;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            transition: all 0.3s;
+        }
+        #shop-back-btn:hover {
+            border-color: #0ff;
+            color: #0ff;
+            box-shadow: 0 0 20px rgba(0,255,255,0.3);
+        }
     </style>
 </head>
 <body>
 
 <div id="score-display">0%</div>
-<div id="coin-display">0 / 5</div>
 <div id="gem-display">&#x1F48E; 0 / 3</div>
 <div id="attempt-display">Pokus #1</div>
 <div id="progress-bar-container"><div id="progress-bar"></div></div>
@@ -234,6 +329,8 @@
     <div class="subtitle">Na Steroidech</div>
     <div class="controls-info" id="controls-info"></div>
     <button class="start-btn" id="start-btn">START</button>
+    <button id="shop-btn" style="margin-top:15px;padding:10px 35px;font-size:clamp(13px,3vw,18px);font-weight:800;border:2px solid #00aaff;background:transparent;color:#00aaff;cursor:pointer;letter-spacing:3px;text-transform:uppercase;transition:all 0.3s;">OBCHOD</button>
+    <div id="start-gems-display" style="margin-top:12px;color:#00aaff;font-size:clamp(12px,2.5vw,16px);font-weight:700;text-shadow:0 0 8px #00aaff;">&#x1F48E; 0</div>
 </div>
 
 <div id="death-screen">
@@ -242,6 +339,13 @@
     <div class="death-percent" id="death-best">Nejlepší: 0%</div>
     <button class="start-btn" id="retry-btn">ZNOVU</button>
     <div style="margin-top:18px;color:#aaa;font-size:14px;letter-spacing:1px;">Mezerník / Klik / Dotek = restart</div>
+</div>
+
+<div id="shop-screen">
+    <h2>OBCHOD</h2>
+    <div id="shop-gems-display">&#x1F48E; 0</div>
+    <div class="shop-items" id="shop-items"></div>
+    <button id="shop-back-btn">ZPĚT</button>
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
@@ -271,6 +375,9 @@ let speed = 0.12;
 let baseSpeed = 0.12;
 let score = 0;
 let bestScore = parseInt(localStorage.getItem('gd_bestScore') || '0', 10);
+let totalGems = parseInt(localStorage.getItem('gd_totalGems') || '0', 10);
+let ownedSkins = JSON.parse(localStorage.getItem('gd_ownedSkins') || '["default"]');
+let activeSkin = localStorage.getItem('gd_activeSkin') || 'default';
 let attempts = 1;
 let distance = 0;
 let totalLevelLength = 900;
@@ -311,15 +418,97 @@ const IS_MOBILE = /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini
 // Level data
 let levelData = [];
 let levelIndex = 0;
-let coins = [];
-let collectedCoins = 0;
-const TOTAL_COINS = 5;
 let gems = [];
 let collectedGems = 0;
 const TOTAL_GEMS = 3;
 
 const PLAYER_SIZE = 0.55;
 const GROUND_LEVEL = 0.6;
+
+// --- SHOP SKINS ---
+const SKINS = [
+    { id: 'default', name: 'Výchozí', price: 0, emoji: '🟦' },
+    { id: 'skin67', name: '67', price: 3, emoji: '67' },
+    { id: 'skull', name: 'Lebka', price: 5, emoji: '💀' },
+    { id: 'poop', name: 'Bobek', price: 4, emoji: '💩' },
+];
+
+function openShop() {
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('shop-screen').style.display = 'flex';
+    renderShop();
+}
+
+function closeShop() {
+    document.getElementById('shop-screen').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'flex';
+    updateStartGemsDisplay();
+}
+
+function updateStartGemsDisplay() {
+    document.getElementById('start-gems-display').textContent = '\u{1F48E} ' + totalGems;
+}
+
+function renderShop() {
+    document.getElementById('shop-gems-display').textContent = '\u{1F48E} ' + totalGems;
+    const container = document.getElementById('shop-items');
+    container.innerHTML = '';
+
+    for (const skin of SKINS) {
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        if (ownedSkins.includes(skin.id)) div.classList.add('owned');
+        if (activeSkin === skin.id) div.classList.add('active');
+
+        const preview = document.createElement('div');
+        preview.className = 'shop-item-preview';
+        preview.textContent = skin.emoji;
+        div.appendChild(preview);
+
+        const name = document.createElement('div');
+        name.className = 'shop-item-name';
+        name.textContent = skin.name;
+        div.appendChild(name);
+
+        if (ownedSkins.includes(skin.id)) {
+            const status = document.createElement('div');
+            status.className = 'shop-item-status';
+            status.textContent = activeSkin === skin.id ? '✔ AKTIVNÍ' : 'VYBRAT';
+            status.style.color = activeSkin === skin.id ? '#0f0' : '#0ff';
+            div.appendChild(status);
+        } else {
+            const price = document.createElement('div');
+            price.className = 'shop-item-price';
+            price.textContent = '\u{1F48E} ' + skin.price;
+            if (totalGems < skin.price) price.style.color = '#f55';
+            div.appendChild(price);
+        }
+
+        div.addEventListener('click', () => handleSkinClick(skin));
+        div.addEventListener('touchend', (e) => { e.preventDefault(); handleSkinClick(skin); });
+        container.appendChild(div);
+    }
+}
+
+function handleSkinClick(skin) {
+    if (ownedSkins.includes(skin.id)) {
+        // Select this skin
+        activeSkin = skin.id;
+        localStorage.setItem('gd_activeSkin', activeSkin);
+        applySkinToPlayer();
+        renderShop();
+    } else if (totalGems >= skin.price) {
+        // Buy it
+        totalGems -= skin.price;
+        localStorage.setItem('gd_totalGems', totalGems);
+        ownedSkins.push(skin.id);
+        localStorage.setItem('gd_ownedSkins', JSON.stringify(ownedSkins));
+        activeSkin = skin.id;
+        localStorage.setItem('gd_activeSkin', activeSkin);
+        applySkinToPlayer();
+        renderShop();
+    }
+}
 
 // --- MUSIC ---
 let audioCtx = null;
@@ -489,6 +678,7 @@ function init() {
 
     // Player
     createPlayer();
+    applySkinToPlayer();
 
     // Ground
     createGround();
@@ -517,19 +707,19 @@ function init() {
 
     // Mouse events (for desktop)
     window.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.start-btn')) return;
+        if (e.target.closest('.start-btn, #shop-btn, #shop-screen, #shop-back-btn')) return;
         jumpPressed = true;
     });
     window.addEventListener('mouseup', () => { jumpPressed = false; });
 
     // Touch events (for mobile/tablet)
     window.addEventListener('touchstart', (e) => {
-        if (e.target.closest('.start-btn')) return;
+        if (e.target.closest('.start-btn, #shop-btn, #shop-screen, #shop-back-btn')) return;
         e.preventDefault();
         jumpPressed = true;
     }, { passive: false });
     window.addEventListener('touchend', (e) => {
-        if (e.target.closest('.start-btn')) return;
+        if (e.target.closest('.start-btn, #shop-btn, #shop-screen, #shop-back-btn')) return;
         e.preventDefault();
         jumpPressed = false;
     }, { passive: false });
@@ -542,10 +732,19 @@ function init() {
     // Buttons - use both click and touchend for reliability
     const startBtn = document.getElementById('start-btn');
     const retryBtn = document.getElementById('retry-btn');
+    const shopBtn = document.getElementById('shop-btn');
+    const shopBackBtn = document.getElementById('shop-back-btn');
     startBtn.addEventListener('click', startGame);
     retryBtn.addEventListener('click', restartGame);
+    shopBtn.addEventListener('click', openShop);
+    shopBackBtn.addEventListener('click', closeShop);
     startBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); startGame(); });
     retryBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); restartGame(); });
+    shopBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); openShop(); });
+    shopBackBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); closeShop(); });
+
+    // Show total gems on start screen
+    updateStartGemsDisplay();
 
     // Restart from death screen with spacebar, click, or touch anywhere
     document.addEventListener('keydown', (e) => {
@@ -570,6 +769,63 @@ function init() {
 }
 
 // --- PLAYER ---
+function createSkinTexture(skinId) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    if (skinId === 'skin67') {
+        ctx.fillStyle = '#111';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = '#0ff';
+        ctx.font = 'bold 150px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = '#0ff';
+        ctx.shadowBlur = 30;
+        ctx.fillText('67', 128, 128);
+    } else if (skinId === 'skull') {
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.font = '180px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💀', 128, 138);
+    } else if (skinId === 'poop') {
+        ctx.fillStyle = '#1a1a0a';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.font = '180px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💩', 128, 138);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+}
+
+function applySkinToPlayer() {
+    if (!player) return;
+    const mat = player.material;
+
+    if (activeSkin === 'default') {
+        mat.map = null;
+        mat.color.set(0x00ffff);
+        mat.emissive.set(0x00aaff);
+        mat.emissiveIntensity = 0.6;
+        mat.needsUpdate = true;
+    } else {
+        const tex = createSkinTexture(activeSkin);
+        mat.map = tex;
+        mat.color.set(0xffffff);
+        mat.emissive.set(0x444444);
+        mat.emissiveIntensity = 0.4;
+        mat.needsUpdate = true;
+    }
+}
+
 function createPlayer() {
     playerGroup = new THREE.Group();
 
@@ -1164,15 +1420,6 @@ function generateLevel() {
         createObstacle(item);
     }
 
-    // Place 5 coins on the normal path, reachable with a jump
-    const sectionLength = totalLevelLength / (TOTAL_COINS + 1);
-    const coinY = 1.5 + PLAYER_SIZE / 2; // comfortable jump height
-
-    for (let i = 0; i < TOTAL_COINS; i++) {
-        const coinX = sectionLength * (i + 1);
-        createCoin(coinX, coinY);
-    }
-
     // Place 3 blue gems - spread across the level, high up (need good jump)
     const gemSection = totalLevelLength / (TOTAL_GEMS + 1);
     const gemY = 2.5 + PLAYER_SIZE / 2; // high up - harder to reach
@@ -1255,39 +1502,6 @@ function createTrophy(x) {
     trophyGroup.position.set(x, GROUND_LEVEL - 0.6 + 0.2, 0);
     scene.add(trophyGroup);
     trophy = trophyGroup;
-}
-
-function createCoin(x, y) {
-    const coinGroup = new THREE.Group();
-    const size = PLAYER_SIZE;
-
-    // Solid bright yellow box - same size as player, always visible
-    const geo = new THREE.BoxGeometry(size, size, size);
-    const mat = new THREE.MeshStandardMaterial({
-        color: 0xffd700,
-        emissive: 0xffaa00,
-        emissiveIntensity: 2.0,
-        metalness: 0.8,
-        roughness: 0.1,
-    });
-    const cube = new THREE.Mesh(geo, mat);
-    coinGroup.add(cube);
-
-    // Bright glow sphere around it
-    const glowGeo = new THREE.SphereGeometry(size, 12, 8);
-    const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xffdd00,
-        transparent: true,
-        opacity: 0.25,
-        blending: THREE.AdditiveBlending,
-    });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    coinGroup.add(glow);
-
-    coinGroup.position.set(x, y, 0);
-    coinGroup.userData = { type: 'coin', collected: false };
-    scene.add(coinGroup);
-    coins.push(coinGroup);
 }
 
 function createGem(x, y) {
@@ -1873,47 +2087,6 @@ function exitRocketMode() {
     rotation = 0;
 }
 
-function checkCoinCollection() {
-    const px = playerGroup.position.x;
-    const py = playerGroup.position.y;
-    const collectRadius = 0.9;
-
-    for (const coin of coins) {
-        if (coin.userData.collected) continue;
-        const dx = px - coin.position.x;
-        const dy = py - coin.position.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < collectRadius) {
-            coin.userData.collected = true;
-            coin.visible = false;
-            collectedCoins++;
-            document.getElementById('coin-display').textContent = `${collectedCoins} / ${TOTAL_COINS}`;
-
-            // Collection effect - gold particles
-            for (let i = 0; i < 15; i++) {
-                const pGeo = new THREE.SphereGeometry(0.08, 4, 4);
-                const pMat = new THREE.MeshBasicMaterial({
-                    color: 0xffd700,
-                    transparent: true,
-                    opacity: 0.9,
-                });
-                const p = new THREE.Mesh(pGeo, pMat);
-                p.position.set(coin.position.x, coin.position.y, coin.position.z);
-                p.userData = {
-                    vx: (Math.random() - 0.5) * 0.15,
-                    vy: Math.random() * 0.15,
-                    vz: (Math.random() - 0.5) * 0.15,
-                    life: 1.0,
-                    rotSpeed: Math.random() * 0.2,
-                };
-                scene.add(p);
-                particles.push(p);
-            }
-        }
-    }
-}
-
 function checkGemCollection() {
     const px = playerGroup.position.x;
     const py = playerGroup.position.y;
@@ -1929,6 +2102,8 @@ function checkGemCollection() {
             gem.userData.collected = true;
             gem.visible = false;
             collectedGems++;
+            totalGems++;
+            localStorage.setItem('gd_totalGems', totalGems);
             document.getElementById('gem-display').textContent = '\u{1F48E} ' + collectedGems + ' / ' + TOTAL_GEMS;
 
             // Blue sparkle effect
@@ -2029,9 +2204,6 @@ function restartGame() {
         if (g.geometry) g.geometry.dispose();
         if (g.material) g.material.dispose();
     }
-    for (const c of coins) {
-        scene.remove(c);
-    }
     for (const g of gems) {
         scene.remove(g);
     }
@@ -2045,10 +2217,8 @@ function restartGame() {
     trailParticles = [];
     shockwaves = [];
     groundTiles = [];
-    coins = [];
     gems = [];
     portals = [];
-    collectedCoins = 0;
     collectedGems = 0;
 
     // Reset rocket mode
@@ -2057,7 +2227,6 @@ function restartGame() {
     player.visible = true;
     playerGroup.children[1].visible = true;
     playerGroup.children[2].visible = true;
-    document.getElementById('coin-display').textContent = `0 / ${TOTAL_COINS}`;
     document.getElementById('gem-display').textContent = `\u{1F48E} 0 / ${TOTAL_GEMS}`;
 
     // Recreate
@@ -2104,7 +2273,7 @@ function die() {
 
     setTimeout(() => {
         document.getElementById('death-screen').style.display = 'flex';
-        document.getElementById('death-score').textContent = `Skóre: ${percent}% | Coiny: ${collectedCoins}/${TOTAL_COINS} | Gemy: ${collectedGems}/${TOTAL_GEMS}`;
+        document.getElementById('death-score').textContent = `Skóre: ${percent}% | Gemy: ${collectedGems}/${TOTAL_GEMS}`;
         document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
     }, 800);
 }
@@ -2354,17 +2523,8 @@ function update(dt) {
         return;
     }
 
-    // Coin collection
-    checkCoinCollection();
+    // Gem collection
     checkGemCollection();
-
-    // Animate coins (slow spin + bob)
-    for (const coin of coins) {
-        if (coin.userData.collected) continue;
-        coin.rotation.y += 0.02 * dt;
-        coin.rotation.x += 0.01 * dt;
-        coin.children[0].position.y = Math.sin(Date.now() * 0.003 + coin.position.x) * 0.15;
-    }
 
     // Animate gems (3D spin + float) and move with world
     for (const gem of gems) {
@@ -2565,7 +2725,7 @@ function animate(timestamp) {
                     document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
                     document.getElementById('death-screen').querySelector('h2').style.color = '#0f0';
                     document.getElementById('death-screen').querySelector('h2').style.textShadow = '0 0 20px #0f0, 0 0 40px #0f0';
-                    document.getElementById('death-score').textContent = `Skóre: 100% | Coiny: ${collectedCoins}/${TOTAL_COINS} | Gemy: ${collectedGems}/${TOTAL_GEMS}`;
+                    document.getElementById('death-score').textContent = `Skóre: 100% | Gemy: ${collectedGems}/${TOTAL_GEMS}`;
                     document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
                 }, 2000);
             }
