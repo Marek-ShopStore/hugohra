@@ -241,6 +241,7 @@
     <div class="death-score" id="death-score">Skóre: 0%</div>
     <div class="death-percent" id="death-best">Nejlepší: 0%</div>
     <button class="start-btn" id="retry-btn">ZNOVU</button>
+    <div style="margin-top:18px;color:#aaa;font-size:14px;letter-spacing:1px;">Mezerník / Klik / Dotek = restart</div>
 </div>
 
 <div class="flash-overlay" id="flash-overlay"></div>
@@ -545,6 +546,25 @@ function init() {
     retryBtn.addEventListener('click', restartGame);
     startBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); startGame(); });
     retryBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); restartGame(); });
+
+    // Restart from death screen with spacebar, click, or touch anywhere
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && isDead && document.getElementById('death-screen').style.display === 'flex') {
+            e.preventDefault();
+            restartGame();
+        }
+    });
+    document.addEventListener('click', (e) => {
+        if (isDead && document.getElementById('death-screen').style.display === 'flex' && e.target.id !== 'retry-btn') {
+            restartGame();
+        }
+    });
+    document.addEventListener('touchend', (e) => {
+        if (isDead && document.getElementById('death-screen').style.display === 'flex' && e.target.id !== 'retry-btn') {
+            e.preventDefault();
+            restartGame();
+        }
+    });
 
     animate();
 }
