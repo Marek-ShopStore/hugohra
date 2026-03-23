@@ -61,6 +61,17 @@
             letter-spacing: 1px;
         }
 
+        #gem-display {
+            position: fixed;
+            top: 70px; right: 15px;
+            color: #00aaff;
+            font-size: clamp(14px, 3vw, 22px);
+            font-weight: 900;
+            text-shadow: 0 0 10px #00aaff, 0 0 20px #0066ff;
+            z-index: 20;
+            letter-spacing: 1px;
+        }
+
         #progress-bar-container {
             position: fixed;
             top: 0; left: 0;
@@ -214,6 +225,7 @@
 
 <div id="score-display">0%</div>
 <div id="coin-display">0 / 5</div>
+<div id="gem-display">&#x1F48E; 0 / 3</div>
 <div id="attempt-display">Pokus #1</div>
 <div id="progress-bar-container"><div id="progress-bar"></div></div>
 
@@ -301,6 +313,9 @@ let levelIndex = 0;
 let coins = [];
 let collectedCoins = 0;
 const TOTAL_COINS = 5;
+let gems = [];
+let collectedGems = 0;
+const TOTAL_GEMS = 3;
 
 const PLAYER_SIZE = 0.55;
 const GROUND_LEVEL = 0.6;
@@ -677,38 +692,67 @@ function createGround() {
 
 // --- STARS ---
 function createStars() {
-    const starsGeo = new THREE.BufferGeometry();
-    const positions = [];
-    const colors = [];
-    const sizes = [];
-
-    const starCount = IS_MOBILE ? 800 : 2000;
-    for (let i = 0; i < starCount; i++) {
-        positions.push(
-            (Math.random() - 0.5) * 200,
-            Math.random() * 60 + 5,
-            (Math.random() - 0.5) * 100 - 20
+    // Layer 1: Dense small white/blue stars (distant)
+    const farGeo = new THREE.BufferGeometry();
+    const farPos = [];
+    const farColors = [];
+    const farCount = IS_MOBILE ? 1500 : 4000;
+    for (let i = 0; i < farCount; i++) {
+        farPos.push(
+            (Math.random() - 0.5) * 400,
+            Math.random() * 80 + 3,
+            -30 - Math.random() * 70
         );
-
         const c = new THREE.Color();
-        c.setHSL(Math.random(), 0.8, 0.7);
-        colors.push(c.r, c.g, c.b);
-        sizes.push(Math.random() * 2 + 0.5);
+        const rnd = Math.random();
+        if (rnd < 0.6) c.setHSL(0, 0, 0.7 + Math.random() * 0.3); // white
+        else if (rnd < 0.85) c.setHSL(0.6, 0.4, 0.7); // light blue
+        else c.setHSL(0.15, 0.3, 0.8); // warm yellow
+        farColors.push(c.r, c.g, c.b);
     }
-
-    starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    starsGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-    const starsMat = new THREE.PointsMaterial({
-        size: 0.15,
+    farGeo.setAttribute('position', new THREE.Float32BufferAttribute(farPos, 3));
+    farGeo.setAttribute('color', new THREE.Float32BufferAttribute(farColors, 3));
+    const farMat = new THREE.PointsMaterial({
+        size: 0.08,
         vertexColors: true,
         transparent: true,
-        opacity: 0.8,
+        opacity: 0.9,
         blending: THREE.AdditiveBlending,
     });
-    const starField = new THREE.Points(starsGeo, starsMat);
-    scene.add(starField);
-    bgStars.push(starField);
+    const farField = new THREE.Points(farGeo, farMat);
+    scene.add(farField);
+    bgStars.push(farField);
+
+    // Layer 2: Brighter closer stars (twinkling feel)
+    const nearGeo = new THREE.BufferGeometry();
+    const nearPos = [];
+    const nearColors = [];
+    const nearCount = IS_MOBILE ? 200 : 500;
+    for (let i = 0; i < nearCount; i++) {
+        nearPos.push(
+            (Math.random() - 0.5) * 300,
+            Math.random() * 60 + 5,
+            -10 - Math.random() * 50
+        );
+        const c = new THREE.Color();
+        const rnd = Math.random();
+        if (rnd < 0.5) c.setHSL(0, 0, 1.0); // bright white
+        else if (rnd < 0.75) c.setHSL(0.58, 0.8, 0.8); // cyan/blue
+        else c.setHSL(0.08, 0.6, 0.9); // warm
+        nearColors.push(c.r, c.g, c.b);
+    }
+    nearGeo.setAttribute('position', new THREE.Float32BufferAttribute(nearPos, 3));
+    nearGeo.setAttribute('color', new THREE.Float32BufferAttribute(nearColors, 3));
+    const nearMat = new THREE.PointsMaterial({
+        size: 0.2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+    });
+    const nearField = new THREE.Points(nearGeo, nearMat);
+    scene.add(nearField);
+    bgStars.push(nearField);
 }
 
 // --- JUMP PHYSICS CALCULATOR ---
@@ -1109,6 +1153,14 @@ function generateLevel() {
         createCoin(coinX, coinY);
     }
 
+    // Place 3 blue gems - spread across the level, high up (need good jump)
+    const gemSection = totalLevelLength / (TOTAL_GEMS + 1);
+    const gemY = 2.5 + PLAYER_SIZE / 2; // high up - harder to reach
+    for (let i = 0; i < TOTAL_GEMS; i++) {
+        const gemX = gemSection * (i + 1) + gemSection * 0.3;
+        createGem(gemX, gemY);
+    }
+
     // Place trophy at the end of the level
     createTrophy(totalLevelLength + 5);
 }
@@ -1218,6 +1270,62 @@ function createCoin(x, y) {
     coins.push(coinGroup);
 }
 
+function createGem(x, y) {
+    const gemGroup = new THREE.Group();
+    const size = PLAYER_SIZE * 0.6;
+
+    // Diamond shape (two pyramids)
+    const topGeo = new THREE.ConeGeometry(size * 0.6, size * 0.8, 6);
+    const gemMat = new THREE.MeshStandardMaterial({
+        color: 0x0088ff,
+        emissive: 0x0066ff,
+        emissiveIntensity: 2.5,
+        metalness: 0.9,
+        roughness: 0.0,
+        transparent: true,
+        opacity: 0.85,
+    });
+    const top = new THREE.Mesh(topGeo, gemMat);
+    top.position.y = size * 0.2;
+    gemGroup.add(top);
+
+    const bottomGeo = new THREE.ConeGeometry(size * 0.6, size * 0.5, 6);
+    const bottom = new THREE.Mesh(bottomGeo, gemMat);
+    bottom.rotation.x = Math.PI;
+    bottom.position.y = -size * 0.15;
+    gemGroup.add(bottom);
+
+    // Inner bright core
+    const coreGeo = new THREE.OctahedronGeometry(size * 0.25, 0);
+    const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xaaddff,
+        transparent: true,
+        opacity: 0.9,
+    });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    gemGroup.add(core);
+
+    // Outer glow
+    const glowGeo = new THREE.SphereGeometry(size * 1.2, 12, 8);
+    const glowMat = new THREE.MeshBasicMaterial({
+        color: 0x0088ff,
+        transparent: true,
+        opacity: 0.2,
+        blending: THREE.AdditiveBlending,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    gemGroup.add(glow);
+
+    // Point light
+    const gemLight = new THREE.PointLight(0x0088ff, 2, 5);
+    gemGroup.add(gemLight);
+
+    gemGroup.position.set(x, y, 0);
+    gemGroup.userData = { type: 'gem', collected: false };
+    scene.add(gemGroup);
+    gems.push(gemGroup);
+}
+
 // --- OBSTACLES ---
 function createObstacle(data) {
     let mesh;
@@ -1237,7 +1345,7 @@ function createObstacle(data) {
             roughness: 0.3,
         });
         mesh = new THREE.Mesh(geo, mat);
-        mesh.position.set(data.x, baseY + spikeH / 2, 0);
+        mesh.position.set(data.x, baseY + spikeH / 2 + 0.05, 0);
         mesh.castShadow = true;
 
         // Glow ring at base
@@ -1250,7 +1358,7 @@ function createObstacle(data) {
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(data.x, baseY + 0.05, 0);
+        ring.position.set(data.x, baseY + 0.1, 0);
         scene.add(ring);
         decorations.push(ring);
 
@@ -1769,6 +1877,49 @@ function checkCoinCollection() {
     }
 }
 
+function checkGemCollection() {
+    const px = playerGroup.position.x;
+    const py = playerGroup.position.y;
+    const collectRadius = 0.8;
+
+    for (const gem of gems) {
+        if (gem.userData.collected) continue;
+        const dx = px - gem.position.x;
+        const dy = py - gem.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < collectRadius) {
+            gem.userData.collected = true;
+            gem.visible = false;
+            collectedGems++;
+            document.getElementById('gem-display').textContent = '\u{1F48E} ' + collectedGems + ' / ' + TOTAL_GEMS;
+
+            // Blue sparkle effect
+            for (let i = 0; i < 20; i++) {
+                const pGeo = new THREE.SphereGeometry(0.06, 4, 4);
+                const pMat = new THREE.MeshBasicMaterial({
+                    color: 0x00aaff,
+                    transparent: true,
+                    opacity: 1.0,
+                });
+                const p = new THREE.Mesh(pGeo, pMat);
+                p.position.set(gem.position.x, gem.position.y, gem.position.z);
+                p.userData = {
+                    vx: (Math.random() - 0.5) * 0.2,
+                    vy: (Math.random() - 0.5) * 0.2,
+                    vz: (Math.random() - 0.5) * 0.2,
+                    life: 1.0,
+                    decay: 0.02 + Math.random() * 0.02,
+                    rotSpeed: Math.random() * 0.3,
+                };
+                scene.add(p);
+                particles.push(p);
+            }
+            cameraShake = 0.15;
+        }
+    }
+}
+
 // --- GAME LOGIC ---
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
@@ -1844,6 +1995,9 @@ function restartGame() {
     for (const c of coins) {
         scene.remove(c);
     }
+    for (const g of gems) {
+        scene.remove(g);
+    }
     for (const p of portals) {
         scene.remove(p);
     }
@@ -1855,8 +2009,10 @@ function restartGame() {
     shockwaves = [];
     groundTiles = [];
     coins = [];
+    gems = [];
     portals = [];
     collectedCoins = 0;
+    collectedGems = 0;
 
     // Reset rocket mode
     isRocketMode = false;
@@ -1865,6 +2021,7 @@ function restartGame() {
     playerGroup.children[1].visible = true;
     playerGroup.children[2].visible = true;
     document.getElementById('coin-display').textContent = `0 / ${TOTAL_COINS}`;
+    document.getElementById('gem-display').textContent = `\u{1F48E} 0 / ${TOTAL_GEMS}`;
 
     // Recreate
     createGround();
@@ -1910,7 +2067,7 @@ function die() {
 
     setTimeout(() => {
         document.getElementById('death-screen').style.display = 'flex';
-        document.getElementById('death-score').textContent = `Skóre: ${percent}% | Coiny: ${collectedCoins}/${TOTAL_COINS}`;
+        document.getElementById('death-score').textContent = `Skóre: ${percent}% | Coiny: ${collectedCoins}/${TOTAL_COINS} | Gemy: ${collectedGems}/${TOTAL_GEMS}`;
         document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
     }, 800);
 }
@@ -2162,6 +2319,7 @@ function update(dt) {
 
     // Coin collection
     checkCoinCollection();
+    checkGemCollection();
 
     // Animate coins (slow spin + bob)
     for (const coin of coins) {
@@ -2169,6 +2327,14 @@ function update(dt) {
         coin.rotation.y += 0.02 * dt;
         coin.rotation.x += 0.01 * dt;
         coin.children[0].position.y = Math.sin(Date.now() * 0.003 + coin.position.x) * 0.15;
+    }
+
+    // Animate gems (spin + float) and move with world
+    for (const gem of gems) {
+        gem.position.x -= moveAmount;
+        if (gem.userData.collected) continue;
+        gem.rotation.y += 0.04 * dt;
+        gem.children[0].position.y = 0.2 + Math.sin(Date.now() * 0.004 + gem.position.x) * 0.15;
     }
 
     // Win condition - start ride-to-trophy animation
@@ -2356,7 +2522,7 @@ function animate(timestamp) {
                     document.getElementById('death-screen').querySelector('h2').textContent = 'HOTOVO!';
                     document.getElementById('death-screen').querySelector('h2').style.color = '#0f0';
                     document.getElementById('death-screen').querySelector('h2').style.textShadow = '0 0 20px #0f0, 0 0 40px #0f0';
-                    document.getElementById('death-score').textContent = `Skóre: 100% | Coiny: ${collectedCoins}/${TOTAL_COINS}`;
+                    document.getElementById('death-score').textContent = `Skóre: 100% | Coiny: ${collectedCoins}/${TOTAL_COINS} | Gemy: ${collectedGems}/${TOTAL_GEMS}`;
                     document.getElementById('death-best').textContent = `Nejlepší: ${bestScore}%`;
                 }, 2000);
             }
