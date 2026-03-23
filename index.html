@@ -778,13 +778,21 @@ function createSkinTexture(skinId) {
     if (skinId === 'skin67') {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 180px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        // Glow layers for extra punch
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 15;
-        ctx.fillText('67', 128, 128);
+        ctx.shadowBlur = 40;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 210px sans-serif';
+        ctx.fillText('67', 128, 135);
+        // Second pass for extra brightness
+        ctx.shadowBlur = 20;
+        ctx.fillText('67', 128, 135);
+        // Outline stroke
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 6;
+        ctx.strokeText('67', 128, 135);
     } else if (skinId === 'skull') {
         ctx.fillStyle = '#1a1a1a';
         ctx.fillRect(0, 0, 256, 256);
