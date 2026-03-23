@@ -829,16 +829,31 @@ function generateLevel() {
                     { type: 'spike', x: pos + 1.2, y: 0, spikeHeight: spikeH() },
                 ];
             } else {
-                // Connected platform bridge with spikes underneath
-                const steps = 2 + Math.floor(Math.random() * 2);
+                // Staircase up to platform with spikes on top
                 const pw = 2.0 + Math.random() * 0.5;
-                let py = 1.0 + Math.random() * 0.3;
+                const stairSteps = 2 + Math.floor(Math.random() * 2);
+                const topHeight = 1.2 + Math.random() * 0.5;
+                const platH = 0.35;
                 groupObstacles = [];
-                for (let s = 0; s < steps; s++) {
-                    const px = pos + s * (pw - 0.1); // overlap slightly for connection
-                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
-                    groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
-                    py += 0.3 + Math.random() * 0.3; // gradually go up
+
+                // Stair steps going up
+                for (let s = 0; s < stairSteps; s++) {
+                    const px = pos + s * (pw - 0.1);
+                    const stepY = 0.6 + (s + 1) * (topHeight / stairSteps);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: stepY });
+                }
+
+                // Top flat platform with spikes on it
+                const topY = 0.6 + topHeight;
+                const topStart = pos + stairSteps * (pw - 0.1);
+                const topSegments = 2 + Math.floor(Math.random() * 2);
+                for (let s = 0; s < topSegments; s++) {
+                    const px = topStart + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: topY });
+                    // Spikes on top of the platform
+                    if (s < topSegments - 1) {
+                        groupObstacles.push({ type: 'spike', x: px + pw * 0.3, y: 0, spikeHeight: 0.7, baseY: topY + platH / 2 });
+                    }
                 }
             }
         } else if (difficulty < 0.7) {
@@ -860,18 +875,30 @@ function generateLevel() {
                     { type: 'spike', x: pos + 2.2, y: 0, spikeHeight: spikeH() },
                 ];
             } else if (r < 0.75) {
-                // Connected ascending platforms with spikes
-                const steps = 3 + Math.floor(Math.random() * 2);
-                const pw = 1.8 + Math.random() * 0.6;
-                let py = 0.9 + Math.random() * 0.2;
+                // Staircase to high platform with spikes on top
+                const pw = 2.0 + Math.random() * 0.4;
+                const platH = 0.35;
+                const topHeight = 1.8 + Math.random() * 0.6;
+                const stairSteps = 3;
                 groupObstacles = [];
-                for (let s = 0; s < steps; s++) {
+
+                // Stair steps
+                for (let s = 0; s < stairSteps; s++) {
                     const px = pos + s * (pw - 0.1);
-                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: py });
-                    if (s < steps - 1) {
-                        groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: spikeH() });
+                    const stepY = 0.6 + (s + 1) * (topHeight / stairSteps);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: stepY });
+                }
+
+                // Top flat section with spikes on the platforms
+                const topY = 0.6 + topHeight;
+                const topStart = pos + stairSteps * (pw - 0.1);
+                const topSegments = 2 + Math.floor(Math.random() * 2);
+                for (let s = 0; s < topSegments; s++) {
+                    const px = topStart + s * (pw - 0.1);
+                    groupObstacles.push({ type: 'platform', x: px, y: 0, width: pw, platformY: topY });
+                    if (s > 0 && s < topSegments - 1) {
+                        groupObstacles.push({ type: 'spike', x: px, y: 0, spikeHeight: 0.8, baseY: topY + platH / 2 });
                     }
-                    py += 0.4 + Math.random() * 0.3;
                 }
             } else if (r < 0.88) {
                 // Spike then connected platforms going up
