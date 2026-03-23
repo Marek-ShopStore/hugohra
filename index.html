@@ -1272,52 +1272,69 @@ function createCoin(x, y) {
 
 function createGem(x, y) {
     const gemGroup = new THREE.Group();
-    const size = PLAYER_SIZE * 0.6;
+    const size = PLAYER_SIZE * 1.8;
 
-    // Diamond shape (two pyramids)
-    const topGeo = new THREE.ConeGeometry(size * 0.6, size * 0.8, 6);
+    // Main gem body - octahedron (proper 3D diamond shape)
+    const mainGeo = new THREE.OctahedronGeometry(size * 0.5, 0);
     const gemMat = new THREE.MeshStandardMaterial({
         color: 0x0088ff,
-        emissive: 0x0066ff,
-        emissiveIntensity: 2.5,
-        metalness: 0.9,
-        roughness: 0.0,
+        emissive: 0x0055ff,
+        emissiveIntensity: 2.0,
+        metalness: 1.0,
+        roughness: 0.05,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.8,
     });
-    const top = new THREE.Mesh(topGeo, gemMat);
-    top.position.y = size * 0.2;
-    gemGroup.add(top);
+    const mainGem = new THREE.Mesh(mainGeo, gemMat);
+    mainGem.scale.set(1, 1.3, 1); // stretch vertically for diamond look
+    gemGroup.add(mainGem);
 
-    const bottomGeo = new THREE.ConeGeometry(size * 0.6, size * 0.5, 6);
-    const bottom = new THREE.Mesh(bottomGeo, gemMat);
-    bottom.rotation.x = Math.PI;
-    bottom.position.y = -size * 0.15;
-    gemGroup.add(bottom);
-
-    // Inner bright core
-    const coreGeo = new THREE.OctahedronGeometry(size * 0.25, 0);
-    const coreMat = new THREE.MeshBasicMaterial({
-        color: 0xaaddff,
+    // Faceted outer shell (wireframe)
+    const wireGeo = new THREE.OctahedronGeometry(size * 0.52, 0);
+    const wireMat = new THREE.MeshBasicMaterial({
+        color: 0x66ccff,
+        wireframe: true,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.5,
+    });
+    const wire = new THREE.Mesh(wireGeo, wireMat);
+    wire.scale.set(1, 1.3, 1);
+    gemGroup.add(wire);
+
+    // Inner bright core (glowing center)
+    const coreGeo = new THREE.OctahedronGeometry(size * 0.2, 1);
+    const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xcceeFF,
+        transparent: true,
+        opacity: 0.95,
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
     gemGroup.add(core);
 
-    // Outer glow
-    const glowGeo = new THREE.SphereGeometry(size * 1.2, 12, 8);
+    // Outer glow sphere
+    const glowGeo = new THREE.SphereGeometry(size * 0.8, 16, 12);
     const glowMat = new THREE.MeshBasicMaterial({
         color: 0x0088ff,
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.15,
         blending: THREE.AdditiveBlending,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
     gemGroup.add(glow);
 
-    // Point light
-    const gemLight = new THREE.PointLight(0x0088ff, 2, 5);
+    // Second glow - pulsing ring
+    const ringGeo = new THREE.TorusGeometry(size * 0.45, 0.03, 8, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x44aaff,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    gemGroup.add(ring);
+
+    // Point light - stronger for bigger gem
+    const gemLight = new THREE.PointLight(0x0088ff, 3, 8);
     gemGroup.add(gemLight);
 
     gemGroup.position.set(x, y, 0);
@@ -2329,12 +2346,18 @@ function update(dt) {
         coin.children[0].position.y = Math.sin(Date.now() * 0.003 + coin.position.x) * 0.15;
     }
 
-    // Animate gems (spin + float) and move with world
+    // Animate gems (3D spin + float) and move with world
     for (const gem of gems) {
         gem.position.x -= moveAmount;
         if (gem.userData.collected) continue;
-        gem.rotation.y += 0.04 * dt;
-        gem.children[0].position.y = 0.2 + Math.sin(Date.now() * 0.004 + gem.position.x) * 0.15;
+        gem.rotation.y += 0.03 * dt;
+        gem.rotation.x = Math.sin(Date.now() * 0.002) * 0.2;
+        gem.position.y += Math.sin(Date.now() * 0.003 + gem.position.x * 0.5) * 0.003;
+        // Pulse the ring
+        if (gem.children[4]) {
+            gem.children[4].rotation.x += 0.05 * dt;
+            gem.children[4].rotation.z += 0.03 * dt;
+        }
     }
 
     // Win condition - start ride-to-trophy animation
