@@ -776,14 +776,14 @@ function createSkinTexture(skinId) {
     const ctx = canvas.getContext('2d');
 
     if (skinId === 'skin67') {
-        ctx.fillStyle = '#111';
+        ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#0ff';
-        ctx.font = 'bold 150px monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 180px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowColor = '#0ff';
-        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 15;
         ctx.fillText('67', 128, 128);
     } else if (skinId === 'skull') {
         ctx.fillStyle = '#1a1a1a';
@@ -815,6 +815,13 @@ function applySkinToPlayer() {
         mat.color.set(0x00ffff);
         mat.emissive.set(0x00aaff);
         mat.emissiveIntensity = 0.6;
+        mat.needsUpdate = true;
+    } else if (activeSkin === 'skin67') {
+        const tex = createSkinTexture(activeSkin);
+        mat.map = tex;
+        mat.color.set(0x222222);
+        mat.emissive.set(0x111111);
+        mat.emissiveIntensity = 0.3;
         mat.needsUpdate = true;
     } else {
         const tex = createSkinTexture(activeSkin);
@@ -2038,7 +2045,7 @@ function checkPortalCollision() {
         if (portal.userData.passed) continue;
         const ox = portal.position.x;
         const oy = portal.userData.portalY;
-        const portalRadius = portal.userData.toRocket ? 1.5 : 3.0;
+        const portalRadius = portal.userData.toRocket ? 3.0 : 3.0;
         if (Math.abs(px - ox) < 1.5 && Math.abs(py - oy) < portalRadius) {
             portal.userData.passed = true;
             const toRocket = portal.userData.toRocket;
