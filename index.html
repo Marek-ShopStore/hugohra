@@ -1002,7 +1002,7 @@ function generateLevel() {
             // Insert a rocket/flappy section
             const sectionLength = 40 + Math.floor(difficulty * 30);
             const portalX = pos + 3;
-            levelData.push({ type: 'portal', x: portalX, toRocket: true, portalY: 2.5 });
+            levelData.push({ type: 'portal', x: portalX, toRocket: true, portalY: 2.6 });
 
             // Generate flappy bird pipes
             let pipeX = portalX + 8;
@@ -1341,7 +1341,7 @@ function createObstacle(data) {
         // Portal - glowing ring that switches mode
         const portalGroup = new THREE.Group();
         const portalColor = data.toRocket ? 0xff8800 : 0x00ffff;
-        const portalScale = data.toRocket ? 1.0 : 2.2; // Exit portal much bigger
+        const portalScale = data.toRocket ? 2.0 : 2.2;
 
         // Outer ring
         const ringGeo = new THREE.TorusGeometry(1.2 * portalScale, 0.12 * portalScale, 16, 32);
